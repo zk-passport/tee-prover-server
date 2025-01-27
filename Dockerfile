@@ -39,4 +39,4 @@ RUN cargo install --path .
 
 COPY ./zkeys ./zkeys 
 
-CMD ["tee-server"]
+ENTRYPOINT ["tee-server"]

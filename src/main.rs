@@ -12,7 +12,8 @@ use std::sync::Arc;
 
 use clap::Parser;
 use db::{
-    create_proof_status, listen_status_update, update_proof, update_proof_status,
+    // create_proof_status, listen_status_update, update_proof, update_proof_status,
+    update_proof,
     StatusUpdatePayload,
 };
 use futures_util::stream::StreamExt;
@@ -20,7 +21,6 @@ use futures_util::SinkExt;
 use generator::{proof_generator::ProofGenerator, witness_generator::WitnessGenerator};
 use jsonrpsee::server::Server;
 use server::RpcServer;
-use sqlx::postgres::PgPoolOptions;
 use store::HashMapStore;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::RwLock;
@@ -88,22 +88,22 @@ async fn main() {
 
     let server = Server::builder().build(server_url).await.unwrap();
 
-    let pool = match PgPoolOptions::new()
-        .max_connections(20)
-        .connect(&config.database_url)
-        .await
-    {
-        Ok(pool) => pool,
-        Err(e) => {
-            panic!("Error: {:?}", e);
-        }
-    };
+    // let pool = match PgPoolOptions::new()
+    //     .max_connections(20)
+    //     .connect(&config.database_url)
+    //     .await
+    // {
+    //     Ok(pool) => pool,
+    //     Err(e) => {
+    //         panic!("Error: {:?}", e);
+    //     }
+    // };
 
     let circuit_folder = config.circuit_folder;
     let circuit_file_prefix = config.circuit_file_prefix;
     let zkey_folder = config.zkey_folder;
 
-    let mut circuit_zkey_map = HashMap::new();
+    let mut circuit_zkey_map: HashMap<String, String> = HashMap::new();
     for pair in config.circuit_zkey_map.iter() {
         circuit_zkey_map.insert(pair.0.clone(), pair.1.clone());
     }
@@ -130,7 +130,7 @@ async fn main() {
 
     let connection_map: ConnectionMap = Arc::new(RwLock::new(HashMap::new()));
 
-    let rapid_snark_path_exe = path::Path::new("./rapidsnark")
+    let rapid_snark_path_exe = path::Path::new(&config.rapidsnark_path)
         .join("package")
         .join("bin")
         .join("prover");
@@ -184,9 +184,9 @@ async fn main() {
                 }
         } => {}
 
-        _ = async {
-            let _ = listen_status_update(&pool, "status_update", Arc::clone(&connection_map)).await;
-        } => {}
+        // _ = async {
+        //     let _ = listen_status_update(&pool, "status_update", Arc::clone(&connection_map)).await;
+        // } => {}
 
         _ = async {
             while let Some(file_generator) = file_generator_receiver.recv().await {
@@ -194,7 +194,7 @@ async fn main() {
                 let proof_type = file_generator.proof_type();
 
                 //maybe it's better to panic / unwrap here?
-                let _ = create_proof_status(uuid, &proof_type, db::types::Status::Pending, &pool).await;
+                // let _ = create_proof_status(uuid, &proof_type, db::types::Status::Pending, &pool).await;
 
                 let witness_generator_clone = witness_generator_sender.clone();
                 tokio::spawn(async move {
@@ -251,9 +251,10 @@ async fn main() {
             while let Some(proof_generator) = proof_generator_receiver.recv().await {
                 let uuid = proof_generator.uuid();
                 let proof_type = proof_generator.proof_type();
-                let _ = update_proof_status(uuid.clone(), &proof_type, db::types::Status::WitnessGenerated, &pool).await;
-                let _ = proof_generator.run(&rapid_snark_path).await;
-                let _ = update_proof(uuid, &proof_type, &pool).await;
+                // let _ = update_proof_status(uuid.clone(), &proof_type, db::types::Status::WitnessGenerated, &pool).await;
+                let res = proof_generator.run(&rapid_snark_path).await;
+                dbg!(res);
+                let _ = update_proof(uuid, &proof_type).await;
             }
         } => {}
     }
