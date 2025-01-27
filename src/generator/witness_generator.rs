@@ -5,7 +5,7 @@ use crate::utils::get_tmp_folder_path;
 use super::ProofType;
 
 pub struct WitnessGenerator {
-    uuid: String,
+    pub uuid: String,
     proof_type: ProofType,
     circuit_file_name: String,
 }
@@ -45,7 +45,6 @@ impl WitnessGenerator {
         }
 
         let circuit_exe = format!("./{}", path.into_os_string().into_string().unwrap());
-        dbg!(&circuit_exe);
         let tmp_folder_path = get_tmp_folder_path(&self.uuid, &self.proof_type);
         let input_file = tmp_folder_path.clone() + "/input.json";
         let output_file = tmp_folder_path + "/output.wtns";
@@ -57,7 +56,7 @@ impl WitnessGenerator {
             .await
         {
             Ok(output) => {
-                dbg!(&self.uuid, &output);
+                // dbg!(&self.uuid, &output);
             }
             Err(err) => {
                 dbg!(err.to_string());

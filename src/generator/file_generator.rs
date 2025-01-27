@@ -20,6 +20,14 @@ impl FileGenerator {
         }
     }
 
+    pub fn uuid(&self) -> String {
+        self.uuid.clone()
+    }
+
+    pub fn proof_type(&self) -> ProofType {
+        self.proof_type.clone()
+    }
+
     //create the tmp folder
     //create the inputs file
     //create the public_inputs file

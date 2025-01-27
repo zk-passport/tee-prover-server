@@ -19,6 +19,14 @@ impl ProofGenerator {
         }
     }
 
+    pub fn uuid(&self) -> String {
+        self.uuid.clone()
+    }
+
+    pub fn proof_type(&self) -> ProofType {
+        self.proof_type.clone()
+    }
+
     //TODO: check if all these files exist
     pub async fn run(&self, rapid_snark_path_exe: &String) {
         let witness_file_path_str = get_tmp_folder_path(&self.uuid, &self.proof_type);
@@ -39,7 +47,7 @@ impl ProofGenerator {
             .await
         {
             Ok(output) => {
-                dbg!(&self.uuid, &output);
+                // dbg!(&self.uuid, &output);
             }
             Err(err) => {
                 dbg!(err.to_string());
