@@ -257,9 +257,4 @@ async fn main() {
             }
         } => {}
     }
-
-    println!("hi");
 }
-
-//proveSha1Sha1Sha1Rsa655374096=proveSha1Sha1Sha1Rsa655374096.zkey
-//proveSha256Sha256Sha256EcdsaBrainpoolP256r1=proveSha256Sha256Sha256EcdsaBrainpoolP256r1.zkey
