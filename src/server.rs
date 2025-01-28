@@ -207,18 +207,18 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
                 ProofType::Disclose
             };
 
-            let file_generator = FileGenerator::new(uuid.clone(), proof_type, circuit);
-
-            match self.file_generator_sender.send(file_generator).await {
-                Ok(()) => (),
-                Err(e) => {
-                    return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
-                        500, //INTERNAL_SERVER_ERROR
-                        e.to_string(),
-                        None,
-                    ));
-                }
-            }
+            // let file_generator = FileGenerator::new(uuid.clone(), proof_type, circuit);
+            //
+            // match self.file_generator_sender.send(file_generator).await {
+            //     Ok(()) => (),
+            //     Err(e) => {
+            //         return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
+            //             500, //INTERNAL_SERVER_ERROR
+            //             e.to_string(),
+            //             None,
+            //         ));
+            //     }
+            // }
         }
 
         ResponsePayload::success(uuid)

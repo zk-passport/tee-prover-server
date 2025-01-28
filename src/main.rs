@@ -130,15 +130,15 @@ async fn main() {
 
     let connection_map: ConnectionMap = Arc::new(RwLock::new(HashMap::new()));
 
-    let rapid_snark_path_exe = path::Path::new(&config.rapidsnark_path)
-        .join("package")
-        .join("bin")
-        .join("prover");
+    // let rapid_snark_path_exe = path::Path::new(&config.rapidsnark_path)
+    //     .join("package")
+    //     .join("bin")
+    //     .join("prover");
 
-    if !rapid_snark_path_exe.exists() {
-        panic!("rapid snark path does not exist!");
-    }
-    let rapid_snark_path = rapid_snark_path_exe.into_os_string().into_string().unwrap();
+    // if !rapid_snark_path_exe.exists() {
+    //     panic!("rapid snark path does not exist!");
+    // }
+    // let rapid_snark_path = rapid_snark_path_exe.into_os_string().into_string().unwrap();
 
     let (file_generator_sender, mut file_generator_receiver) = tokio::sync::mpsc::channel(10);
     let (witness_generator_sender, mut witness_generator_receiver) = tokio::sync::mpsc::channel(10);
@@ -252,8 +252,8 @@ async fn main() {
                 let uuid = proof_generator.uuid();
                 let proof_type = proof_generator.proof_type();
                 // let _ = update_proof_status(uuid.clone(), &proof_type, db::types::Status::WitnessGenerated, &pool).await;
-                let res = proof_generator.run(&rapid_snark_path).await;
-                dbg!(res);
+                // let res = proof_generator.run(&rapid_snark_path).await;
+                // dbg!(res);
                 let _ = update_proof(uuid, &proof_type).await;
             }
         } => {}
