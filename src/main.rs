@@ -96,7 +96,7 @@ async fn main() {
     let handle = server
         .start(server::RpcServerImpl::new(HashMapStore::new(), file_generator_sender).into_rpc());
 
-    handle.stopped().await;
+    // handle.stopped().await
 
     println!("Server running on: http://{}", server_addr);
 
@@ -157,10 +157,10 @@ async fn main() {
     let rapid_snark_path = rapid_snark_path_exe.into_os_string().into_string().unwrap();
 
     tokio::select! {
-        // _ = handle.stopped() => {
-        //     //delete tmp folders
-        //     println!("Server stopped");
-        // }
+        _ = handle.stopped() => {
+            //delete tmp folders
+            println!("Server stopped");
+        }
 
         _ = async {
                 let connection_map_clone = Arc::clone(&connection_map);
