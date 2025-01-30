@@ -1,0 +1,4 @@
+sudo dnf install socat -y
+socat tcp-listen:8888,fork,reuseaddr vsock-connect:7:8888 # for the rpc server
+socat vsock-listen:8889,fork,reuseaddr TCP4:<DB_HOST>:5432 # for the db
+socat tcp-listen:8890,fork,reuseaddr vsock-connect:7:8890 # for the ws server
