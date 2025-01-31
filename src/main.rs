@@ -181,7 +181,6 @@ async fn main() {
                             println!("Error accepting connection: {}", e);
                         }
                     }
-
                 }
         } => {}
 

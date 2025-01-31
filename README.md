@@ -39,5 +39,4 @@ docker run \
     -z registerSha1Sha256Sha256Rsa655374096=registerSha1Sha256Sha256Rsa655374096.zkey \
     -z registerSha256Sha256Sha256EcdsaBrainpoolP256r1=registerSha256Sha256Sha256EcdsaBrainpoolP256r1.zkey \
     --database-url=postgres://postgres:mysecretpassword@host.docker.internal:5433/db
-
 ```

@@ -25,13 +25,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER status_update_notify ON proof_statuses;
 CREATE TRIGGER status_update_notify
 AFTER UPDATE ON proof_statuses
 FOR EACH ROW
 EXECUTE PROCEDURE status_update_notify();
 
-DROP TRIGGER status_insert_notify ON proof_statuses;
 CREATE TRIGGER status_insert_notify
 AFTER INSERT ON proof_statuses
 FOR EACH ROW
