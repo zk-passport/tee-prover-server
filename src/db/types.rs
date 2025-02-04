@@ -1,9 +1,3 @@
-pub struct Proofs {
-    id: String,
-    status: Status,
-    proof: sqlx::types::Json<serde_json::Value>,
-}
-
 pub enum Status {
     Pending,
     WitnessGenerated,

@@ -12,79 +12,17 @@ use std::sync::Arc;
 
 use aws_nitro_enclaves_nsm_api::driver::{nsm_exit, nsm_init};
 use clap::Parser;
-use db::{
-    create_proof_status, listen_status_update, update_proof, update_proof_status,
-    StatusUpdatePayload,
-};
-use futures_util::stream::StreamExt;
-use futures_util::SinkExt;
+use db::{create_proof_status, update_proof, update_proof_status};
 use generator::{proof_generator::ProofGenerator, witness_generator::WitnessGenerator};
 use jsonrpsee::server::Server;
 use server::RpcServer;
 use sqlx::postgres::PgPoolOptions;
 use store::HashMapStore;
-use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::RwLock;
-use tokio_tungstenite::tungstenite::Message;
-use tokio_tungstenite::{accept_async, WebSocketStream};
-use types::ConnectionMap;
-
-pub async fn handle_connection(
-    ws_stream: WebSocketStream<TcpStream>,
-    connection_map: ConnectionMap,
-) {
-    let (mut ws_sender, mut ws_receiver) = ws_stream.split();
-
-    let (update_tx, mut update_rx) = tokio::sync::mpsc::channel::<StatusUpdatePayload>(100);
-
-    match ws_receiver.next().await {
-        Some(Ok(message)) => {
-            connection_map
-                .write()
-                .await
-                .insert(message.to_string(), update_tx);
-        }
-        Some(Err(e)) => {
-            println!("Error receiving message: {}", e);
-            return;
-        }
-        None => {
-            return;
-        }
-    };
-
-    let send_task = tokio::spawn(async move {
-        while let Some(payload) = update_rx.recv().await {
-            if let Err(e) = ws_sender
-                .send(Message::text(&serde_json::to_string(&payload).unwrap()))
-                .await
-            {
-                println!("Error sending message: {}", e);
-                break;
-            }
-        }
-    });
-
-    let receive_task = tokio::spawn(async move {
-        while let Some(Ok(msg)) = ws_receiver.next().await {
-            println!("Received message: {}", msg);
-        }
-    });
-
-    tokio::select! {
-        _ = send_task => {}
-        _ = receive_task => {}
-    };
-
-    connection_map.write().await.retain(|_, v| !v.is_closed());
-    println!("Connection closed");
-}
 
 #[tokio::main]
 async fn main() {
     let config = args::Config::parse();
     let server_url = config.server_address;
-    let ws_server_url = config.ws_server_url;
 
     let server = Server::builder().build(server_url).await.unwrap();
 
@@ -102,10 +40,6 @@ async fn main() {
     // handle.stopped().await
 
     println!("Server running on: http://{}", server_addr);
-
-    let listener = TcpListener::bind(&ws_server_url)
-        .await
-        .expect("Failed to bind");
 
     let pool = match PgPoolOptions::new()
         .max_connections(20)
@@ -147,8 +81,6 @@ async fn main() {
 
     let circuit_zkey_map_arc = Arc::new(circuit_zkey_map);
 
-    let connection_map: ConnectionMap = Arc::new(RwLock::new(HashMap::new()));
-
     let rapid_snark_path_exe = path::Path::new(&config.rapidsnark_path)
         .join("package")
         .join("bin")
@@ -165,32 +97,6 @@ async fn main() {
             println!("Server stopped");
             nsm_exit(fd);
         }
-
-        _ = async {
-                let connection_map_clone = Arc::clone(&connection_map);
-                loop {
-                    match listener.accept().await {
-                        Ok((stream, _)) => {
-                            let peer_addr = stream
-                                .peer_addr()
-                                .expect("Connected streams should have a peer address");
-                            println!("New connection: {}", peer_addr);
-
-                            let ws_stream = accept_async(stream)
-                                .await
-                                .expect("Error during the websocket handshake");
-                            tokio::spawn(handle_connection(ws_stream, Arc::clone(&connection_map_clone)));
-                        },
-                        Err(e) => {
-                            println!("Error accepting connection: {}", e);
-                        }
-                    }
-                }
-        } => {}
-
-    _ = async {
-        let _ = listen_status_update(&pool, "status_update", Arc::clone(&connection_map)).await;
-    } => {}
 
     _ = async {
         while let Some(file_generator) = file_generator_receiver.recv().await {
@@ -255,7 +161,8 @@ async fn main() {
             let uuid = proof_generator.uuid();
             let proof_type = proof_generator.proof_type();
             let _ = update_proof_status(uuid.clone(), &proof_type, db::types::Status::WitnessGenerated, &pool).await;
-            let res = proof_generator.run(&rapid_snark_path).await;
+            //handle error
+            let _res = proof_generator.run(&rapid_snark_path).await;
             let _ = update_proof(uuid, &proof_type, &pool).await;
         }
     } => {}

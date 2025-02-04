@@ -106,33 +106,3 @@ pub struct StatusUpdatePayload {
     new_status: i32,
     proof: Option<sqlx::types::Json<Proof>>,
 }
-
-pub async fn listen_status_update(
-    pool: &sqlx::Pool<sqlx::Postgres>,
-    channel: &str,
-    connection_map: crate::types::ConnectionMap,
-) {
-    let mut listener = sqlx::postgres::PgListener::connect_with(pool)
-        .await
-        .unwrap();
-
-    listener.listen(channel).await.unwrap();
-
-    loop {
-        while let Ok(notification) = listener.recv().await {
-            let payload = notification.payload().to_owned();
-
-            let payload: StatusUpdatePayload = serde_json::from_str(&payload).unwrap();
-
-            let connection_map_rwlock = connection_map.read().await;
-
-            let status_update_sender =
-                match connection_map_rwlock.get(&payload.request_id.to_string()) {
-                    Some(sender) => sender,
-                    None => continue,
-                };
-
-            status_update_sender.send(payload).await.unwrap();
-        }
-    }
-}
