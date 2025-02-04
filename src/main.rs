@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use std::path;
 use std::sync::Arc;
 
+use aws_nitro_enclaves_nsm_api::driver::{nsm_exit, nsm_init};
 use clap::Parser;
 use db::{
     create_proof_status, listen_status_update, update_proof, update_proof_status,
@@ -92,9 +93,11 @@ async fn main() {
     let (proof_generator_sender, mut proof_generator_receiver) = tokio::sync::mpsc::channel(10);
 
     let server_addr = server.local_addr().unwrap();
+    let fd = nsm_init();
 
-    let handle = server
-        .start(server::RpcServerImpl::new(HashMapStore::new(), file_generator_sender).into_rpc());
+    let handle = server.start(
+        server::RpcServerImpl::new(fd, HashMapStore::new(), file_generator_sender).into_rpc(),
+    );
 
     // handle.stopped().await
 
@@ -160,6 +163,7 @@ async fn main() {
         _ = handle.stopped() => {
             //delete tmp folders
             println!("Server stopped");
+            nsm_exit(fd);
         }
 
         _ = async {

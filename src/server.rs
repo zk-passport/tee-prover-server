@@ -1,5 +1,5 @@
 use aws_nitro_enclaves_nsm_api::api::{ErrorCode, Request, Response};
-use aws_nitro_enclaves_nsm_api::driver::{nsm_exit, nsm_init, nsm_process_request};
+use aws_nitro_enclaves_nsm_api::driver::nsm_process_request;
 use jsonrpsee::core::async_trait;
 use jsonrpsee::proc_macros::rpc;
 use jsonrpsee::{types::ErrorObjectOwned, ResponsePayload};
@@ -36,13 +36,19 @@ pub trait Rpc {
 }
 
 pub struct RpcServerImpl<S> {
+    fd: i32,
     store: Arc<Mutex<S>>,
     file_generator_sender: tokio::sync::mpsc::Sender<FileGenerator>,
 }
 
 impl<S> RpcServerImpl<S> {
-    pub fn new(store: S, file_generator_sender: tokio::sync::mpsc::Sender<FileGenerator>) -> Self {
+    pub fn new(
+        fd: i32,
+        store: S,
+        file_generator_sender: tokio::sync::mpsc::Sender<FileGenerator>,
+    ) -> Self {
         Self {
+            fd,
             store: Arc::new(Mutex::new(store)),
             file_generator_sender,
         }
@@ -86,6 +92,22 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
         .as_ref()
         .to_vec();
 
+        let attestation = match utils::get_attestation(
+            self.fd,
+            Some(user_pubkey.clone()),
+            None,
+            Some(my_public_key.clone()),
+        ) {
+            Ok(attestation) => attestation,
+            Err(err) => {
+                return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
+                    500, //INTERNAL_SERVER_ERROR
+                    format!("{:?}", err),
+                    None,
+                ));
+            }
+        };
+
         let their_public_key = UnparsedPublicKey::new(&ECDH_P256, user_pubkey.as_slice());
 
         let derived_key_result =
@@ -102,7 +124,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
                 }
             };
 
-        let uuid_ = uuid::Uuid::new_v4();
+        let uuid = uuid::Uuid::new_v4();
 
         let mut store = match self.store.lock() {
             Ok(store) => store,
@@ -115,7 +137,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
             }
         };
 
-        match store.insert_new_agreement(uuid_, derived_key_result) {
+        match store.insert_new_agreement(uuid, derived_key_result) {
             Ok(_) => (),
             Err(_) => {
                 return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
@@ -128,7 +150,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
 
         drop(store);
 
-        ResponsePayload::success(HelloResponse::new(uuid_, my_public_key).into())
+        ResponsePayload::success(HelloResponse::new(uuid, attestation).into())
     }
 
     //TODO: check if circuit exists
@@ -136,7 +158,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
         &self,
         uuid: String,
         nonce: Vec<u8>,
-        cipehr_text: Vec<u8>,
+        cipher_text: Vec<u8>,
         auth_tag: Vec<u8>,
     ) -> ResponsePayload<'static, String> {
         let nonce = nonce.as_slice();
@@ -168,7 +190,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
 
         let key: [u8; 32] = key.try_into().unwrap();
 
-        let decrypted_text = match utils::decrypt(key, cipehr_text, auth_tag, nonce) {
+        let decrypted_text = match utils::decrypt(key, cipher_text, auth_tag, nonce) {
             Ok(text) => text,
             Err(e) => {
                 return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
@@ -184,7 +206,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
             Err(_) => {
                 return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
                     404,
-                    "Failed to parse proof request", //make the error vague so that onlookers don't know what went wrong
+                    "Failed to parse proof request",
                     None,
                 ));
             }
@@ -246,9 +268,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
             public_key: public_key.map(|buf| ByteBuf::from(buf)),
         };
 
-        let fd = nsm_init();
-
-        let result = match nsm_process_request(fd, request) {
+        let result = match nsm_process_request(self.fd, request) {
             Response::Attestation { document } => ResponsePayload::success(document),
             Response::Error(err) => ResponsePayload::error(ErrorObjectOwned::owned::<String>(
                 500, //INTERNAL_SERVER_ERROR
@@ -263,8 +283,6 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
                 ));
             }
         };
-
-        nsm_exit(fd);
 
         return result;
     }
