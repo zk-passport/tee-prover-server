@@ -1,5 +1,8 @@
 use aes_gcm::aead::Aead;
 use aes_gcm::{Aes256Gcm, Key, KeyInit, Nonce};
+use aws_nitro_enclaves_nsm_api::api::{ErrorCode, Request, Response};
+use aws_nitro_enclaves_nsm_api::driver::nsm_process_request;
+use serde_bytes::ByteBuf;
 
 use crate::generator::ProofType;
 
@@ -30,4 +33,23 @@ pub fn decrypt(
 
 pub fn get_tmp_folder_path(uuid: &String, proof_type: &ProofType) -> String {
     format!("./tmp_{}_{}", uuid, proof_type)
+}
+
+pub fn get_attestation(
+    fd: i32,
+    user_data: Option<Vec<u8>>,
+    nonce: Option<Vec<u8>>,
+    public_key: Option<Vec<u8>>,
+) -> Result<Vec<u8>, ErrorCode> {
+    let request = Request::Attestation {
+        user_data: user_data.map(|buf| ByteBuf::from(buf)),
+        nonce: nonce.map(|buf| ByteBuf::from(buf)),
+        public_key: public_key.map(|buf| ByteBuf::from(buf)),
+    };
+
+    match nsm_process_request(fd, request) {
+        Response::Attestation { document } => Ok(document),
+        Response::Error(err) => Err(err),
+        _ => Err(ErrorCode::InvalidResponse), //shouldn't get triggered
+    }
 }

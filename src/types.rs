@@ -9,12 +9,12 @@ use crate::{db::StatusUpdatePayload, generator::Circuit};
 #[derive(Serialize, Clone)]
 pub struct HelloResponse {
     uuid: uuid::Uuid,
-    pubkey: Vec<u8>,
+    attestation: Vec<u8>,
 }
 
 impl HelloResponse {
-    pub fn new(uuid: uuid::Uuid, pubkey: Vec<u8>) -> Self {
-        HelloResponse { uuid, pubkey }
+    pub fn new(uuid: uuid::Uuid, attestation: Vec<u8>) -> Self {
+        HelloResponse { uuid, attestation }
     }
 }
 
