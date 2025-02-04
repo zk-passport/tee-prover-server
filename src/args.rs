@@ -8,10 +8,6 @@ pub struct Config {
     #[arg(short, long, default_value = "0.0.0.0:3001")]
     pub server_address: String,
 
-    /// WebSocket server URL (e.g., ws://0.0.0.0:3002)
-    #[arg(short, long, default_value = "0.0.0.0:3002")]
-    pub ws_server_url: String,
-
     /// PostgreSQL database connection URL
     #[arg(
         short,

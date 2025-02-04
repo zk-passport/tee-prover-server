@@ -1,10 +1,7 @@
-use std::{collections::HashMap, sync::Arc};
-
 use jsonrpsee::ResponsePayload;
 use serde::{Deserialize, Serialize};
-use tokio::sync::RwLock;
 
-use crate::{db::StatusUpdatePayload, generator::Circuit};
+use crate::generator::Circuit;
 
 #[derive(Serialize, Clone)]
 pub struct HelloResponse {
@@ -33,6 +30,3 @@ pub enum ProofRequest {
     #[serde(rename_all = "camelCase")]
     Disclose { disclose: Circuit },
 }
-
-pub type ConnectionMap =
-    Arc<RwLock<HashMap<String, tokio::sync::mpsc::Sender<StatusUpdatePayload>>>>;
