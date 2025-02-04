@@ -64,10 +64,15 @@ pub async fn update_proof(
 
     //remove the unwrap here later
     let proof_string = std::fs::read_to_string(tmp_file_path).unwrap();
-    let proof: serde_json::Value = serde_json::from_str(&proof_string).map_err(|e| {
-        dbg!(&e);
-        sqlx::Error::Decode(e.into()) // Map JSON parsing errors
-    })?;
+    let mut proof_reader = serde_json::de::Deserializer::from_str(&proof_string);
+
+    let proof = match Proof::deserialize(&mut proof_reader) {
+        Ok(proof) => proof,
+        Err(_) => {
+            panic!("error");
+        }
+    };
+
     match sqlx::query(
         "UPDATE proof_statuses SET proof = $1, status = $2  WHERE request_id = $3 AND proof_status_id = $4",
     )

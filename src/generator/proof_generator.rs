@@ -47,7 +47,7 @@ impl ProofGenerator {
             .await
         {
             Ok(output) => {
-                // dbg!(&self.uuid, &output);
+                dbg!(&self.uuid, &output);
             }
             Err(err) => {
                 dbg!(err.to_string());

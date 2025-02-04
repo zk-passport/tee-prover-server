@@ -19,7 +19,6 @@ pub struct Config {
         default_value = "postgres://postgres:mysecretpassword@localhost:5433/db"
     )]
     pub database_url: String,
-
     /// Circuit folder path
     #[arg(short = 'c', long, default_value = "../circuits")]
     pub circuit_folder: String,
@@ -35,6 +34,10 @@ pub struct Config {
     /// Witness calc circuit to zkey mapper
     #[arg(short = 'z', long)]
     pub circuit_zkey_map: Vec<KeyValuePair>,
+
+    /// Rapidsnark path
+    #[arg(short = 'r', long, default_value = "./rapidsnark")]
+    pub rapidsnark_path: String,
 }
 
 #[derive(Debug, Clone)]

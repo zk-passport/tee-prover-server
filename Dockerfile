@@ -1,4 +1,4 @@
-FROM rust:1.81 as builder
+FROM public.ecr.aws/docker/library/rust:1.81-bookworm as rust-builder
 
 RUN apt-get update
 RUN apt-get install build-essential cmake libgmp-dev libsodium-dev nasm curl m4 -y
@@ -39,4 +39,4 @@ RUN cargo install --path .
 
 COPY ./zkeys ./zkeys 
 
-CMD ["tee-server"]
+ENTRYPOINT ["tee-server"]

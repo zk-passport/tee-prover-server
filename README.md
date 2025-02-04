@@ -20,3 +20,9 @@ cd openpassport/circuits
 yarn
 cd ../../
 ```
+
+3. Building the docker image:
+
+```
+docker build -f Dockerfile.tee -t tee-server .
+```
