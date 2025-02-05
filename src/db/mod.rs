@@ -55,7 +55,7 @@ pub async fn update_proof_status(
 }
 
 pub async fn update_proof(
-    uuid: String,
+    uuid: &String,
     proof_type: &ProofType,
     db: &sqlx::Pool<sqlx::Postgres>,
 ) -> Result<(), sqlx::Error> {

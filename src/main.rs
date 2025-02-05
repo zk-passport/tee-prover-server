@@ -18,6 +18,7 @@ use jsonrpsee::server::Server;
 use server::RpcServer;
 use sqlx::postgres::PgPoolOptions;
 use store::HashMapStore;
+use utils::get_tmp_folder_path;
 
 #[tokio::main]
 async fn main() {
@@ -151,7 +152,7 @@ async fn main() {
                                 return;
                             }
                         }
-                    }
+                    } else {}
             });
         }
     } => {}
@@ -163,7 +164,9 @@ async fn main() {
             let _ = update_proof_status(uuid.clone(), &proof_type, db::types::Status::WitnessGenerated, &pool).await;
             //handle error
             let _res = proof_generator.run(&rapid_snark_path).await;
-            let _ = update_proof(uuid, &proof_type, &pool).await;
+            let _ = update_proof(&uuid, &proof_type, &pool).await;
+            let tmp_folder = get_tmp_folder_path(&uuid, &proof_type);
+            let _ = tokio::fs::remove_dir_all(tmp_folder).await;
         }
     } => {}
     }
