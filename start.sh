@@ -11,6 +11,6 @@ socat tcp-listen:8889,fork vsock-connect:3:8889,reuseaddr & # for the db
     --database-url=postgres://postgres:passport@127.0.0.2:8889/db \
     --circuit-folder=/circuits \
     --zkey-folder=/zkeys \
-    --circuit-zkey-map registerSha1Sha256Sha256Rsa655374096=registerSha1Sha256Sha256Rsa655374096.zkey \
-    --circuit-zkey-map registerSha256Sha256Sha256EcdsaBrainpoolP256r1=registerSha256Sha256Sha256EcdsaBrainpoolP256r1.zkey \
+    --circuit-zkey-map register_sha1_sha256_sha256_rsa_65537_4096=register_sha1_sha256_sha256_rsa_65537_4096.zkey \
+    --circuit-zkey-map register_sha256_sha256_sha256_ecdsa_brainpoolP256r1=register_sha256_sha256_sha256_ecdsa_brainpoolP256r1.zkey \
     --rapidsnark-path=/rapidsnark

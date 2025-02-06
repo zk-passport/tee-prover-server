@@ -1,0 +1,19 @@
+node_modules
+.env
+coverage
+coverage.json
+typechain
+typechain-types
+
+#Hardhat files
+cache
+artifacts
+ignition/deployed_addresses.json
+ignition/parameters.json
+ignition/deployments
+
+#Local verifier
+contracts/verifiers/local/*
+
+.yarn
+.yarnrc.yml

@@ -30,7 +30,8 @@ WORKDIR /tee-server
 COPY ./Cargo.lock ./Cargo.lock
 COPY ./Cargo.toml ./Cargo.toml
 
-RUN cargo build --release
+ARG PROOFTYPE=${PROOFTYPE}
+RUN cargo build --release --features $PROOFTYPE
 RUN rm src/*.rs
 
 COPY ./src ./src

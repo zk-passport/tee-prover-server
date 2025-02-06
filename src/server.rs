@@ -8,7 +8,6 @@ use ring::rand::SystemRandom;
 use serde_bytes::ByteBuf;
 use std::sync::{Arc, Mutex};
 
-use crate::generator::ProofType;
 use crate::store::Store;
 use crate::types::ProofRequest;
 use crate::utils;
@@ -212,44 +211,49 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
             }
         };
 
-        let circuits = match proof_request_type {
-            ProofRequest::Register { prove } => {
-                let mut circuits = Vec::new();
-                circuits.push(prove);
-                // circuits.push(dsc);
-                circuits
+        let mut allowed_proof_type = "";
+        if cfg!(feature = "register") {
+            allowed_proof_type = "register";
+        } else if cfg!(feature = "dsc") {
+            allowed_proof_type = "dsc";
+        } else {
+            allowed_proof_type = "disclose";
+        }
+
+        let invalid_proof_type_response =
+            ResponsePayload::error(ErrorObjectOwned::owned::<String>(
+                403,
+                format!("This endpoint only allows {} inputs", allowed_proof_type),
+                None,
+            ));
+
+        match proof_request_type {
+            ProofRequest::Register { .. } => {
+                if !cfg!(feature = "register") {
+                    return invalid_proof_type_response;
+                }
             }
-            ProofRequest::Disclose { disclose } => {
-                let mut circuits = Vec::new();
-                circuits.push(disclose);
-                circuits
+            ProofRequest::Dsc { .. } => {
+                if !cfg!(feature = "dsc") {
+                    return invalid_proof_type_response;
+                }
+            }
+            ProofRequest::Disclose { .. } => {
+                if !cfg!(feature = "disclose") {
+                    return invalid_proof_type_response;
+                }
             }
         };
 
-        let circuits_length = circuits.len();
-
-        for (i, circuit) in circuits.into_iter().enumerate() {
-            let proof_type = if circuits_length == 2 {
-                if i == 0 {
-                    ProofType::Prove
-                } else {
-                    ProofType::Dsc
-                }
-            } else {
-                ProofType::Disclose
-            };
-
-            let file_generator = FileGenerator::new(uuid.clone(), proof_type, circuit);
-
-            match self.file_generator_sender.send(file_generator).await {
-                Ok(()) => (),
-                Err(e) => {
-                    return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
-                        500, //INTERNAL_SERVER_ERROR
-                        e.to_string(),
-                        None,
-                    ));
-                }
+        let file_generator = FileGenerator::new(uuid.clone(), proof_request_type);
+        match self.file_generator_sender.send(file_generator).await {
+            Ok(()) => (),
+            Err(e) => {
+                return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
+                    500, //INTERNAL_SERVER_ERROR
+                    e.to_string(),
+                    None,
+                ));
             }
         }
 

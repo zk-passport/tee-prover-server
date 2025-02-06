@@ -1,0 +1,2 @@
+[workspace]
+members = ["crates/dg1", "crates/econtent"]

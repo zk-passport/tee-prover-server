@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{generator::ProofType, utils::get_tmp_folder_path};
+use crate::{types::ProofType, utils::get_tmp_folder_path};
 pub mod types;
 
 pub async fn create_proof_status(
@@ -9,7 +9,7 @@ pub async fn create_proof_status(
     status: types::Status,
     db: &sqlx::Pool<sqlx::Postgres>,
 ) -> Result<(), sqlx::Error> {
-    let proof_status_id = proof_type.to_int() as i32;
+    let proof_status_id: i32 = proof_type.into();
     let status = status.to_int() as i32;
     match sqlx::query(
         "INSERT INTO proof_statuses (proof_status_id, request_id, status) VALUES ($1, $2, $3)",
@@ -34,7 +34,7 @@ pub async fn update_proof_status(
     status: types::Status,
     db: &sqlx::Pool<sqlx::Postgres>,
 ) -> Result<(), sqlx::Error> {
-    let proof_status_id = proof_type.to_int() as i32;
+    let proof_status_id: i32 = proof_type.into();
     let status = status.to_int() as i32;
 
     match sqlx::query(
@@ -73,13 +73,15 @@ pub async fn update_proof(
         }
     };
 
+    let proof_id: i32 = proof_type.into();
+
     match sqlx::query(
         "UPDATE proof_statuses SET proof = $1, status = $2  WHERE request_id = $3 AND proof_status_id = $4",
     )
     .bind(sqlx::types::Json(proof))
     .bind(types::Status::Completed.to_int() as i32)
     .bind(sqlx::types::Uuid::parse_str(&uuid).unwrap())
-    .bind(proof_type.to_int() as i32)
+    .bind(proof_id)
     .execute(db)
     .await
     {

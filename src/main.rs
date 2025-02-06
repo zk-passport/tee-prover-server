@@ -54,7 +54,6 @@ async fn main() {
     };
 
     let circuit_folder = config.circuit_folder;
-    let circuit_file_prefix = config.circuit_file_prefix;
     let zkey_folder = config.zkey_folder;
 
     let mut circuit_zkey_map: HashMap<String, String> = HashMap::new();
@@ -71,8 +70,7 @@ async fn main() {
         }
 
         let circuit_path = path::Path::new(&circuit_folder)
-            .join(format!("{}{}", circuit_file_prefix, key))
-            .join("src")
+            .join(format!("{}_cpp", key))
             .join(key);
         if !circuit_path.exists() {
             let circuit_path_str = circuit_path.to_str().unwrap();
@@ -131,12 +129,11 @@ async fn main() {
             let proof_generator_sender_clone = proof_generator_sender.clone();
 
             let circuit_folder = circuit_folder.clone();
-            let circuit_file_prefix = circuit_file_prefix.clone();
             let zkey_folder = zkey_folder.clone();
             tokio::spawn(async move {
                 //handle error as well
                 if let Ok((uuid, proof_type, circuit_name)) = witness_generator
-                    .run(&circuit_folder, &circuit_file_prefix)
+                    .run(&circuit_folder)
                     .await {
                         let zkey_file = circuit_zkey_map_arc_clone.get(circuit_name.as_str()).unwrap();
                         let zkey_file_path = path::Path::new(&zkey_folder).join(zkey_file).to_str().unwrap().to_string();

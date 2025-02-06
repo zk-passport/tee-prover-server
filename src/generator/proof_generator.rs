@@ -1,8 +1,6 @@
 use std::path;
 
-use crate::utils::get_tmp_folder_path;
-
-use super::ProofType;
+use crate::{types::ProofType, utils::get_tmp_folder_path};
 
 pub struct ProofGenerator {
     uuid: String,

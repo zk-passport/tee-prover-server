@@ -1,8 +1,6 @@
 use std::path;
 
-use crate::utils::get_tmp_folder_path;
-
-use super::ProofType;
+use crate::{types::ProofType, utils::get_tmp_folder_path};
 
 pub struct WitnessGenerator {
     pub uuid: String,
@@ -26,17 +24,12 @@ impl WitnessGenerator {
 
     pub async fn run(
         &self,
-        circuit_folder: &str,      //folder where all the circuit executables are
-        circuit_file_prefix: &str, //executable circuit file prefix
+        circuit_folder: &str, //folder where all the circuit executables are
     ) -> Result<(String, ProofType, String), WitnessGeneratorError> {
         let circuit_folder_path = path::Path::new(&circuit_folder);
         //TODO: covnert circuit_file_name to camel case if in snake case?
         let path = circuit_folder_path
-            .join(format!(
-                "{}{}",
-                circuit_file_prefix, &self.circuit_file_name
-            ))
-            .join("src")
+            .join(format!("{}_cpp", &self.circuit_file_name))
             .join(&self.circuit_file_name);
 
         if !path.exists() {
@@ -56,7 +49,8 @@ impl WitnessGenerator {
             .await
         {
             Ok(output) => {
-                // dbg!(&self.uuid, &output);
+                dbg!("witness_gen");
+                dbg!(&self.uuid, &output);
             }
             Err(err) => {
                 dbg!(err.to_string());

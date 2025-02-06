@@ -19,10 +19,6 @@ pub struct Config {
     #[arg(short = 'c', long, default_value = "../circuits")]
     pub circuit_folder: String,
 
-    /// Circuit file prefix
-    #[arg(short = 'p', long, default_value = "build_witnesscalc_")]
-    pub circuit_file_prefix: String,
-
     /// ZKey folder path
     #[arg(short = 'k', long, default_value = "./zkeys")]
     pub zkey_folder: String,

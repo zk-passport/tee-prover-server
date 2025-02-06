@@ -1,6 +1,3 @@
-[submodule "witnesscalc"]
-	path = witnesscalc
-	url = git@github.com:zk-passport/witnesscalc.git
 [submodule "openpassport"]
 	path = openpassport
 	url = git@github.com:zk-passport/openpassport.git

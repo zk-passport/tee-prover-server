@@ -4,7 +4,7 @@ use aws_nitro_enclaves_nsm_api::api::{ErrorCode, Request, Response};
 use aws_nitro_enclaves_nsm_api::driver::nsm_process_request;
 use serde_bytes::ByteBuf;
 
-use crate::generator::ProofType;
+use crate::types::ProofType;
 
 pub fn decrypt(
     key: [u8; 32],
