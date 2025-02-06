@@ -1,6 +1,3 @@
-[submodule "openpassport"]
-	path = openpassport
-	url = git@github.com:zk-passport/openpassport.git
 [submodule "rapidsnark"]
 	path = rapidsnark
 	url = git@github.com:iden3/rapidsnark.git
