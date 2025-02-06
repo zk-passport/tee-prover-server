@@ -12,13 +12,13 @@ use std::sync::Arc;
 
 use aws_nitro_enclaves_nsm_api::driver::{nsm_exit, nsm_init};
 use clap::Parser;
-use db::{create_proof_status, update_proof, update_proof_status};
+use db::{create_proof_status, fail_proof, set_witness_generated, update_proof};
 use generator::{proof_generator::ProofGenerator, witness_generator::WitnessGenerator};
 use jsonrpsee::server::Server;
 use server::RpcServer;
 use sqlx::postgres::PgPoolOptions;
 use store::HashMapStore;
-use utils::get_tmp_folder_path;
+use utils::{cleanup, get_tmp_folder_path};
 
 #[tokio::main]
 async fn main() {
@@ -33,10 +33,6 @@ async fn main() {
 
     let server_addr = server.local_addr().unwrap();
     let fd = nsm_init();
-
-    let handle = server.start(
-        server::RpcServerImpl::new(fd, HashMapStore::new(), file_generator_sender).into_rpc(),
-    );
 
     // handle.stopped().await
 
@@ -56,7 +52,7 @@ async fn main() {
     let circuit_folder = config.circuit_folder;
     let zkey_folder = config.zkey_folder;
 
-    let mut circuit_zkey_map: HashMap<String, String> = HashMap::new();
+    let mut circuit_zkey_map = HashMap::new();
     for pair in config.circuit_zkey_map.iter() {
         circuit_zkey_map.insert(pair.0.clone(), pair.1.clone());
     }
@@ -80,6 +76,17 @@ async fn main() {
 
     let circuit_zkey_map_arc = Arc::new(circuit_zkey_map);
 
+    let handle = server.start(
+        server::RpcServerImpl::new(
+            fd,
+            HashMapStore::new(),
+            file_generator_sender,
+            Arc::clone(&circuit_zkey_map_arc),
+            pool.clone(),
+        )
+        .into_rpc(),
+    );
+
     let rapid_snark_path_exe = path::Path::new(&config.rapidsnark_path)
         .join("package")
         .join("bin")
@@ -92,7 +99,6 @@ async fn main() {
 
     tokio::select! {
         _ = handle.stopped() => {
-            //delete tmp folders
             println!("Server stopped");
             nsm_exit(fd);
         }
@@ -102,23 +108,28 @@ async fn main() {
             let uuid = file_generator.uuid();
             let proof_type = file_generator.proof_type();
 
-            let _ = create_proof_status(uuid, &proof_type, db::types::Status::Pending, &pool).await;
+            if let Err(_) = create_proof_status(&uuid, &proof_type, &pool).await {
+                let _ = fail_proof(&uuid, &pool).await;
+                continue;
+            }
 
+            let pool_clone = pool.clone();
             let witness_generator_clone = witness_generator_sender.clone();
             tokio::spawn(async move {
-                let (uuid, proof_type, circuit_name) = match file_generator.run().await {
-                    Ok((uuid, proof_type, circuit_name)) => (uuid, proof_type, circuit_name),
-                    Err(e) => {
-                        dbg!(e);
-                        //when adding db logic add failure to status
+                let (uuid, circuit_name) = match file_generator.run().await {
+                    Ok((uuid, circuit_name)) => (uuid, circuit_name),
+                    Err(_) => {
+                        cleanup(&uuid, &pool_clone).await;
                         return;
                     }
                 };
-                let _ = witness_generator_clone.send(WitnessGenerator::new(
-                    uuid,
-                    proof_type,
+                if let Err(_) = witness_generator_clone.send(WitnessGenerator::new(
+                    uuid.clone(),
                     circuit_name
-                )).await;
+                )).await {
+                    cleanup(&uuid, &pool_clone).await;
+                    return;
+                }
             });
         }
     } => {}
@@ -130,26 +141,30 @@ async fn main() {
 
             let circuit_folder = circuit_folder.clone();
             let zkey_folder = zkey_folder.clone();
+
+            let uuid = witness_generator.uuid.clone();
+
+            let pool_clone = pool.clone();
             tokio::spawn(async move {
-                //handle error as well
-                if let Ok((uuid, proof_type, circuit_name)) = witness_generator
+                match witness_generator
                     .run(&circuit_folder)
                     .await {
+                    Ok((uuid, circuit_name)) => {
                         let zkey_file = circuit_zkey_map_arc_clone.get(circuit_name.as_str()).unwrap();
                         let zkey_file_path = path::Path::new(&zkey_folder).join(zkey_file).to_str().unwrap().to_string();
-                        match proof_generator_sender_clone.send(ProofGenerator::new(
-                            uuid,
-                            proof_type,
+                        if let Err(_) = proof_generator_sender_clone.send(ProofGenerator::new(
+                            uuid.clone(),
                             zkey_file_path,
                         )).await {
-                            Ok(_) => {},
-                            Err(e) => {
-                                dbg!(e);
-                                //when adding db logic add failure to status
-                                return;
-                            }
+                            cleanup(&uuid, &pool_clone).await;
+                            return;
                         }
-                    } else {}
+                    },
+                    Err(_) => {
+                        cleanup(&uuid, &pool_clone).await;
+                        return;
+                    }
+                }
             });
         }
     } => {}
@@ -157,12 +172,20 @@ async fn main() {
     _ = async {
         while let Some(proof_generator) = proof_generator_receiver.recv().await {
             let uuid = proof_generator.uuid();
-            let proof_type = proof_generator.proof_type();
-            let _ = update_proof_status(uuid.clone(), &proof_type, db::types::Status::WitnessGenerated, &pool).await;
+            if let Err(_) = set_witness_generated(uuid.clone(), &pool).await {
+                cleanup(&uuid, &pool).await;
+                continue;
+            }
             //handle error
-            let _res = proof_generator.run(&rapid_snark_path).await;
-            let _ = update_proof(&uuid, &proof_type, &pool).await;
-            let tmp_folder = get_tmp_folder_path(&uuid, &proof_type);
+            if let Err(_) = proof_generator.run(&rapid_snark_path).await {
+                cleanup(&uuid, &pool).await;
+                continue;
+            }
+            if let Err(_) = update_proof(&uuid, &pool).await {
+                cleanup(&uuid, &pool).await;
+                continue;
+            }
+            let tmp_folder = get_tmp_folder_path(&uuid);
             let _ = tokio::fs::remove_dir_all(tmp_folder).await;
         }
     } => {}

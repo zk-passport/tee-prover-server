@@ -1,18 +1,16 @@
 use std::path;
 
-use crate::{types::ProofType, utils::get_tmp_folder_path};
+use crate::utils::get_tmp_folder_path;
 
 pub struct ProofGenerator {
     uuid: String,
-    proof_type: ProofType,
     zkey_file_path: String,
 }
 
 impl ProofGenerator {
-    pub fn new(uuid: String, proof_type: ProofType, zkey_file_path: String) -> Self {
+    pub fn new(uuid: String, zkey_file_path: String) -> Self {
         ProofGenerator {
             uuid,
-            proof_type,
             zkey_file_path,
         }
     }
@@ -21,22 +19,25 @@ impl ProofGenerator {
         self.uuid.clone()
     }
 
-    pub fn proof_type(&self) -> ProofType {
-        self.proof_type.clone()
-    }
-
-    //TODO: check if all these files exist
-    pub async fn run(&self, rapid_snark_path_exe: &String) {
-        let witness_file_path_str = get_tmp_folder_path(&self.uuid, &self.proof_type);
+    pub async fn run(&self, rapid_snark_path_exe: &String) -> Result<(), String> {
+        let witness_file_path_str = get_tmp_folder_path(&self.uuid);
         let witness_file_path = path::Path::new(&witness_file_path_str).join("output.wtns");
 
-        let proof_file_path_str = get_tmp_folder_path(&self.uuid, &self.proof_type);
+        if !witness_file_path.exists() {
+            return Err("Witness file does not exist".to_string());
+        }
+
+        let proof_file_path_str = get_tmp_folder_path(&self.uuid);
         let proof_file_path = path::Path::new(&proof_file_path_str).join("proof.json");
 
-        let public_inputs = get_tmp_folder_path(&self.uuid, &self.proof_type);
+        let public_inputs = get_tmp_folder_path(&self.uuid);
         let public_inputs = path::Path::new(&public_inputs).join("public_inputs.json");
 
-        let _ = match tokio::process::Command::new(format!("./{}", rapid_snark_path_exe))
+        if !public_inputs.exists() {
+            return Err("Public inputs file does not exist".to_string());
+        }
+
+        match tokio::process::Command::new(format!("./{}", rapid_snark_path_exe))
             .arg(&self.zkey_file_path)
             .arg(witness_file_path)
             .arg(proof_file_path)
@@ -45,11 +46,15 @@ impl ProofGenerator {
             .await
         {
             Ok(output) => {
-                dbg!(&self.uuid, &output);
+                if !output.status.success() || output.stderr.len() > 0 {
+                    return Err("Proof failed".to_string());
+                }
             }
             Err(err) => {
-                dbg!(err.to_string());
+                return Err(err.to_string());
             }
         };
+
+        Ok(())
     }
 }

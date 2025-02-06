@@ -1,9 +1,11 @@
-CREATE TABLE IF NOT EXISTS proof_statuses ( 
-    proof_status_id SMALLINT NOT NULL,
-    request_id UUID NOT NULL,
+CREATE TABLE IF NOT EXISTS proofs ( 
+    request_id UUID PRIMARY KEY,
+    proof_type SMALLINT NOT NULL,
     status SMALLINT DEFAULT 0, 
-    proof JSON,
-    PRIMARY KEY (proof_status_id, request_id)
+    created_at TIMESTAMP WITH TIME ZONE,
+    witness_generated_at TIMESTAMP WITH TIME ZONE,
+    proof_generated_at TIMESTAMP WITH TIME ZONE, 
+    proof JSON
 );
 
 CREATE OR REPLACE FUNCTION status_update_notify() RETURNS trigger AS $$
@@ -12,9 +14,12 @@ DECLARE
 BEGIN
   IF (TG_OP = 'UPDATE' AND NEW.status IS DISTINCT FROM OLD.status) OR TG_OP = 'INSERT' THEN
     notification_payload = json_build_object(
-      'proof_status_id', NEW.proof_status_id,
       'request_id', NEW.request_id,
-      'new_status', NEW.status,
+      'proof_type', NEW.proof_type,
+      'status', NEW.status,
+      'created_at', NEW.created_at,
+      'witness_generated_at', NEW.witness_generated_at,
+      'proof_generated_at', NEW.proof_generated_at,
       'proof', NEW.proof
     );
 
@@ -25,12 +30,14 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS status_update_notify ON proofs;
 CREATE TRIGGER status_update_notify
-AFTER UPDATE ON proof_statuses
+AFTER UPDATE ON proofs
 FOR EACH ROW
 EXECUTE PROCEDURE status_update_notify();
 
+DROP TRIGGER IF EXISTS status_insert_notify ON proofs;
 CREATE TRIGGER status_insert_notify
-AFTER INSERT ON proof_statuses
+AFTER INSERT ON proofs
 FOR EACH ROW
 EXECUTE PROCEDURE status_update_notify();

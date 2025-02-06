@@ -4,7 +4,7 @@ use aws_nitro_enclaves_nsm_api::api::{ErrorCode, Request, Response};
 use aws_nitro_enclaves_nsm_api::driver::nsm_process_request;
 use serde_bytes::ByteBuf;
 
-use crate::types::ProofType;
+use crate::db::fail_proof;
 
 pub fn decrypt(
     key: [u8; 32],
@@ -31,8 +31,8 @@ pub fn decrypt(
     }
 }
 
-pub fn get_tmp_folder_path(uuid: &String, proof_type: &ProofType) -> String {
-    format!("./tmp_{}_{}", uuid, proof_type)
+pub fn get_tmp_folder_path(uuid: &String) -> String {
+    format!("./tmp_{}", uuid)
 }
 
 pub fn get_attestation(
@@ -52,4 +52,10 @@ pub fn get_attestation(
         Response::Error(err) => Err(err),
         _ => Err(ErrorCode::InvalidResponse), //shouldn't get triggered
     }
+}
+
+pub async fn cleanup(uuid: &String, pool: &sqlx::Pool<sqlx::Postgres>) {
+    let _ = fail_proof(&uuid, &pool).await;
+    let tmp_folder = get_tmp_folder_path(&uuid);
+    let _ = tokio::fs::remove_dir_all(tmp_folder).await;
 }

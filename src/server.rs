@@ -6,6 +6,9 @@ use jsonrpsee::{types::ErrorObjectOwned, ResponsePayload};
 use ring::agreement::{agree_ephemeral, EphemeralPrivateKey, UnparsedPublicKey, ECDH_P256};
 use ring::rand::SystemRandom;
 use serde_bytes::ByteBuf;
+use sqlx::{Pool, Postgres};
+use std::collections::HashMap;
+use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
 use crate::store::Store;
@@ -16,7 +19,11 @@ use crate::{generator::file_generator::FileGenerator, types::HelloResponse};
 #[rpc(server, namespace = "openpassport")]
 pub trait Rpc {
     #[method(name = "hello")]
-    async fn hello(&self, user_pubkey: Vec<u8>) -> ResponsePayload<'static, HelloResponse>;
+    async fn hello(
+        &self,
+        user_pubkey: Vec<u8>,
+        uuid: uuid::Uuid,
+    ) -> ResponsePayload<'static, HelloResponse>;
     #[method(name = "submit_request")]
     async fn submit_request(
         &self,
@@ -38,6 +45,8 @@ pub struct RpcServerImpl<S> {
     fd: i32,
     store: Arc<Mutex<S>>,
     file_generator_sender: tokio::sync::mpsc::Sender<FileGenerator>,
+    circuit_zkey_map: Arc<HashMap<String, String>>,
+    db: Pool<Postgres>,
 }
 
 impl<S> RpcServerImpl<S> {
@@ -45,18 +54,26 @@ impl<S> RpcServerImpl<S> {
         fd: i32,
         store: S,
         file_generator_sender: tokio::sync::mpsc::Sender<FileGenerator>,
+        circuit_zkey_map: Arc<HashMap<String, String>>,
+        db: Pool<Postgres>,
     ) -> Self {
         Self {
             fd,
             store: Arc::new(Mutex::new(store)),
             file_generator_sender,
+            circuit_zkey_map,
+            db,
         }
     }
 }
 
 #[async_trait]
 impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
-    async fn hello(&self, user_pubkey: Vec<u8>) -> ResponsePayload<'static, HelloResponse> {
+    async fn hello(
+        &self,
+        user_pubkey: Vec<u8>,
+        uuid: uuid::Uuid,
+    ) -> ResponsePayload<'static, HelloResponse> {
         if user_pubkey.len() != 65 {
             return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
                 404, //BAD_REQUEST
@@ -123,7 +140,20 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
                 }
             };
 
-        let uuid = uuid::Uuid::new_v4();
+        match sqlx::query("SELECT * from proofs WHERE request_id = $1")
+            .bind(sqlx::types::uuid::Uuid::from_str(uuid.to_string().as_str()).unwrap())
+            .fetch_one(&self.db)
+            .await
+        {
+            Ok(_) => {
+                return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
+                    403, //BAD REQUEST
+                    "Request ID already exists",
+                    None,
+                ));
+            }
+            Err(_) => (),
+        }
 
         let mut store = match self.store.lock() {
             Ok(store) => store,
@@ -187,7 +217,16 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
             key
         };
 
-        let key: [u8; 32] = key.try_into().unwrap();
+        let key: [u8; 32] = match key.try_into() {
+            Ok(key) => key,
+            Err(_) => {
+                return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
+                    500, //INTERNAL_SERVER_ERROR
+                    "Failed to store ephemeral key",
+                    None,
+                ));
+            }
+        };
 
         let decrypted_text = match utils::decrypt(key, cipher_text, auth_tag, nonce) {
             Ok(text) => text,
@@ -200,8 +239,18 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
             }
         };
 
-        let proof_request_type: ProofRequest = match serde_json::from_str(&decrypted_text) {
-            Ok(proof_request_type) => proof_request_type,
+        let proof_request_type = match serde_json::from_str::<ProofRequest>(&decrypted_text) {
+            Ok(proof_request_type) => {
+                let circuit_name = proof_request_type.circuit().name.clone();
+                if !self.circuit_zkey_map.contains_key(&circuit_name) {
+                    return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
+                        404,
+                        format!("Could not find the given circuit name: {}", &circuit_name),
+                        None,
+                    ));
+                }
+                proof_request_type
+            }
             Err(_) => {
                 return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
                     404,
@@ -222,7 +271,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
 
         let invalid_proof_type_response =
             ResponsePayload::error(ErrorObjectOwned::owned::<String>(
-                403,
+                403, //BAD REQUEST
                 format!("This endpoint only allows {} inputs", allowed_proof_type),
                 None,
             ));
