@@ -8,8 +8,8 @@ RUN cd circom
 RUN cd circom && cargo build --release
 RUN cd circom && cargo install --path circom
 
-WORKDIR /openpassport
-COPY ./openpassport .
+WORKDIR /self
+COPY ./self .
 
 WORKDIR /circuits
 COPY ./witnesscalc .

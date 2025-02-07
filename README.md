@@ -14,10 +14,10 @@ git submodule update --init
 cd ..
 ```
 
-2. Assuming you have yarn installed, install node_modules in the `openpassport/circuits` directory:
+2. Assuming you have yarn installed, install node_modules in the `self/circuits` directory:
 
 ```sh
-cd openpassport/circuits
+cd self/circuits
 yarn
 cd ../../
 ```

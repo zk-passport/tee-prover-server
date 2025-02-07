@@ -9,8 +9,8 @@ RUN cargo build --locked --release --features $PROOFTYPE
 FROM public.ecr.aws/docker/library/rust:1.81-bookworm as circuit-builder
 RUN apt-get update
 RUN apt-get install nlohmann-json3-dev libgmp-dev nasm -y
-WORKDIR /openpassport
-COPY ./openpassport .
+WORKDIR /self
+COPY ./self .
 
 WORKDIR /circuits
 RUN git clone https://github.com/iden3/circom.git
@@ -20,7 +20,7 @@ RUN cargo install --path circom
 
 ARG PROOFTYPE=${PROOFTYPE}
 COPY ./build_witnesscalc.sh .
-RUN ./build_witnesscalc.sh $PROOFTYPE /openpassport /circuits
+RUN ./build_witnesscalc.sh $PROOFTYPE /self /circuits
 
 FROM public.ecr.aws/docker/library/debian:12.6-slim@sha256:2ccc7e39b0a6f504d252f807da1fc4b5bcd838e83e4dec3e2f57b2a4a64e7214
 
