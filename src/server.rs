@@ -31,6 +31,7 @@ pub trait Rpc {
         nonce: Vec<u8>,
         cipher_text: Vec<u8>,
         auth_tag: Vec<u8>,
+        onchain: bool,
     ) -> ResponsePayload<'static, String>;
     #[method(name = "attestation")]
     async fn attestation(
@@ -44,7 +45,7 @@ pub trait Rpc {
 pub struct RpcServerImpl<S> {
     fd: i32,
     store: Arc<Mutex<S>>,
-    file_generator_sender: tokio::sync::mpsc::Sender<FileGenerator>,
+    file_generator_sender: tokio::sync::mpsc::Sender<(bool, FileGenerator)>,
     circuit_zkey_map: Arc<HashMap<String, String>>,
     db: Pool<Postgres>,
 }
@@ -53,7 +54,7 @@ impl<S> RpcServerImpl<S> {
     pub fn new(
         fd: i32,
         store: S,
-        file_generator_sender: tokio::sync::mpsc::Sender<FileGenerator>,
+        file_generator_sender: tokio::sync::mpsc::Sender<(bool, FileGenerator)>,
         circuit_zkey_map: Arc<HashMap<String, String>>,
         db: Pool<Postgres>,
     ) -> Self {
@@ -189,6 +190,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
         nonce: Vec<u8>,
         cipher_text: Vec<u8>,
         auth_tag: Vec<u8>,
+        onchain: bool,
     ) -> ResponsePayload<'static, String> {
         let nonce = nonce.as_slice();
         let auth_tag = auth_tag.as_slice();
@@ -295,7 +297,11 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
         };
 
         let file_generator = FileGenerator::new(uuid.clone(), proof_request_type);
-        match self.file_generator_sender.send(file_generator).await {
+        match self
+            .file_generator_sender
+            .send((onchain, file_generator))
+            .await
+        {
             Ok(()) => (),
             Err(e) => {
                 return ResponsePayload::error(ErrorObjectOwned::owned::<String>(

@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use sqlx::types::chrono::Utc;
+use sqlx::types::{chrono::Utc, Json};
 use tokio::io;
 
 use crate::{types::ProofType, utils::get_tmp_folder_path};
@@ -8,29 +8,37 @@ pub mod types;
 pub async fn create_proof_status(
     uuid: &String,
     proof_type: &ProofType,
+    circuit_name: &str,
+    on_chain: bool,
+    public_inputs: &str,
     db: &sqlx::Pool<sqlx::Postgres>,
-) -> Result<(), sqlx::Error> {
+) -> Result<(), String> {
     let proof_type_id: i32 = proof_type.into();
     let now = Utc::now();
 
     let status: i32 = types::Status::Pending.into();
 
-    match sqlx::query(
-        "INSERT INTO proofs (proof_type, request_id, status, created_at) VALUES ($1, $2, $3, $4)",
+    let public_inputs_json: Json<serde_json::Value> =
+        sqlx::types::Json::decode_from_string(public_inputs)
+            .map_err(|_| "Could not parse public inputs")?;
+
+    let _ = sqlx::query(
+        "INSERT INTO proofs (proof_type, request_id, status, created_at, circuit_name, onchain, public_inputs) VALUES ($1, $2, $3, $4, $5, $6, $7)",
     )
     .bind(proof_type_id)
     .bind(sqlx::types::Uuid::parse_str(&uuid).unwrap())
     .bind(status)
     .bind(now)
+    .bind(circuit_name)
+    .bind(on_chain)
+    .bind(public_inputs_json)
     .execute(db)
-    .await
-    {
-        Ok(_) => Ok(()),
-        Err(e) => {
-            dbg!(&e);
-            return Err(e);
-        }
-    }
+    .await.map_err(|e| {
+        dbg!(e);
+        return "Could not create the record";
+    })?;
+
+    Ok(())
 }
 
 pub async fn set_witness_generated(

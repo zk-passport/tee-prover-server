@@ -37,6 +37,8 @@ RUN apt-get update \
     socat \
     iproute2 \
     git \
+    jq \
+    unzip \
     wget \
     zstd \
     && apt-get clean \

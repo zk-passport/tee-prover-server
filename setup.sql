@@ -2,10 +2,13 @@ CREATE TABLE IF NOT EXISTS proofs (
     request_id UUID PRIMARY KEY,
     proof_type SMALLINT NOT NULL,
     status SMALLINT DEFAULT 0, 
+    circuit_name VARCHAR(255) NOT NULL,
+    onchain BOOLEAN NOT NULL, 
     created_at TIMESTAMP WITH TIME ZONE,
     witness_generated_at TIMESTAMP WITH TIME ZONE,
     proof_generated_at TIMESTAMP WITH TIME ZONE, 
-    proof JSON
+    proof JSON,
+    public_inputs JSON
 );
 
 CREATE OR REPLACE FUNCTION status_update_notify() RETURNS trigger AS $$
@@ -18,9 +21,12 @@ BEGIN
       'proof_type', NEW.proof_type,
       'status', NEW.status,
       'created_at', NEW.created_at,
+      'circuit_name', NEW.circuit_name,
+      'onchain', NEW.onchain, 
       'witness_generated_at', NEW.witness_generated_at,
       'proof_generated_at', NEW.proof_generated_at,
-      'proof', NEW.proof
+      'proof', NEW.proof, 
+      'public_inputs', NEW.public_inputs
     );
 
     PERFORM pg_notify('status_update', notification_payload::text);

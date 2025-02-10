@@ -17,9 +17,9 @@ tar -I zstd -xvf zkeys.tar.zst
     --database-url=postgres://postgres:passport@127.0.0.2:8889/openpassport \
     --circuit-folder=/circuits \
     --zkey-folder=/zkeys \
+    --rapidsnark-path=/rapidsnark \
     --circuit-zkey-map register_sha1_sha256_sha256_rsa_65537_4096=register_sha1_sha256_sha256_rsa_65537_4096.zkey \
-    --circuit-zkey-map register_sha256_sha256_sha256_ecdsa_brainpoolP256r1=register_sha256_sha256_sha256_ecdsa_brainpoolP256r1.zkey \
-    --rapidsnark-path=/rapidsnark
+    --circuit-zkey-map register_sha256_sha256_sha256_ecdsa_brainpoolP256r1=register_sha256_sha256_sha256_ecdsa_brainpoolP256r1.zkey
 
 # For running locally
 # cargo run -- \

@@ -104,11 +104,14 @@ async fn main() {
         }
 
     _ = async {
-        while let Some(file_generator) = file_generator_receiver.recv().await {
+        while let Some((onchain, file_generator)) = file_generator_receiver.recv().await {
             let uuid = file_generator.uuid();
             let proof_type = file_generator.proof_type();
 
-            if let Err(_) = create_proof_status(&uuid, &proof_type, &pool).await {
+            let circuit_name = &file_generator.proof_request.circuit().name;
+            let public_inputs = &file_generator.proof_request.circuit().public_inputs;
+
+            if let Err(_) = create_proof_status(&uuid, &proof_type, circuit_name, onchain, public_inputs, &pool).await {
                 let _ = fail_proof(&uuid, &pool).await;
                 continue;
             }
@@ -176,7 +179,6 @@ async fn main() {
                 cleanup(&uuid, &pool).await;
                 continue;
             }
-            //handle error
             if let Err(_) = proof_generator.run(&rapid_snark_path).await {
                 cleanup(&uuid, &pool).await;
                 continue;
