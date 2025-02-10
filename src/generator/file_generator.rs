@@ -7,7 +7,7 @@ use tokio::io::AsyncWriteExt;
 
 pub struct FileGenerator {
     uuid: String,
-    proof_request: ProofRequest,
+    pub proof_request: ProofRequest,
 }
 
 impl FileGenerator {
