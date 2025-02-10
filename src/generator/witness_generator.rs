@@ -7,11 +7,6 @@ pub struct WitnessGenerator {
     circuit_file_name: String,
 }
 
-#[derive(Debug)]
-pub enum WitnessGeneratorError {
-    CircuitNotFound,
-}
-
 impl WitnessGenerator {
     pub fn new(uuid: String, circuit_file_name: String) -> Self {
         WitnessGenerator {
@@ -23,7 +18,7 @@ impl WitnessGenerator {
     pub async fn run(
         &self,
         circuit_folder: &str, //folder where all the circuit executables are
-    ) -> Result<(String, String), WitnessGeneratorError> {
+    ) -> Result<(String, String), String> {
         let circuit_folder_path = path::Path::new(&circuit_folder);
         //TODO: covnert circuit_file_name to camel case if in snake case?
         let path = circuit_folder_path
@@ -32,7 +27,7 @@ impl WitnessGenerator {
 
         if !path.exists() {
             println!("{:?} does not exist", &path);
-            return Err(WitnessGeneratorError::CircuitNotFound);
+            return Err("Circuit not found".to_string());
         }
 
         let circuit_exe = format!("./{}", path.into_os_string().into_string().unwrap());
@@ -47,12 +42,12 @@ impl WitnessGenerator {
             .await
         {
             Ok(output) => {
-                dbg!("witness_gen");
-                dbg!(&self.uuid, &output);
+                if !output.status.success() || output.stderr.len() > 0 {
+                    return Err("Proof failed".to_string());
+                }
             }
             Err(err) => {
-                dbg!(err.to_string());
-                return Err(WitnessGeneratorError::CircuitNotFound); //TODO: change the error
+                return Err(err.to_string());
             }
         };
 
