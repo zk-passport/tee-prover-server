@@ -1,3 +1,4 @@
+use core::str;
 use std::path;
 
 use crate::utils::get_tmp_folder_path;
@@ -27,7 +28,7 @@ impl WitnessGenerator {
 
         if !path.exists() {
             println!("{:?} does not exist", &path);
-            return Err("Circuit not found".to_string());
+            return Err(format!("Circuit not found: {}", path.to_str().unwrap()));
         }
 
         let circuit_exe = format!("./{}", path.into_os_string().into_string().unwrap());
@@ -43,7 +44,8 @@ impl WitnessGenerator {
         {
             Ok(output) => {
                 if !output.status.success() || output.stderr.len() > 0 {
-                    return Err("Proof failed".to_string());
+                    let str = str::from_utf8(&output.stderr).unwrap();
+                    return Err(str.to_string());
                 }
             }
             Err(err) => {
