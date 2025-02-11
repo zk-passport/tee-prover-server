@@ -111,6 +111,7 @@ async fn main() {
             let circuit_name = &file_generator.proof_request.circuit().name;
 
             if let Err(e) = create_proof_status(&uuid, &proof_type, circuit_name, onchain, &pool).await {
+                dbg!(&e);
                 let _ = fail_proof(&uuid, &pool, e.to_string()).await;
                 continue;
             }
@@ -121,6 +122,7 @@ async fn main() {
                 let (uuid, circuit_name) = match file_generator.run().await {
                     Ok((uuid, circuit_name)) => (uuid, circuit_name),
                     Err(e) => {
+                        dbg!(&e);
                         cleanup(&uuid, &pool_clone, e.to_string()).await;
                         return;
                     }
@@ -129,6 +131,7 @@ async fn main() {
                     uuid.clone(),
                     circuit_name
                 )).await {
+                    dbg!(&e);
                     cleanup(&uuid, &pool_clone, e.to_string()).await;
                     return;
                 }
@@ -155,20 +158,8 @@ async fn main() {
                         let zkey_file = circuit_zkey_map_arc_clone.get(circuit_name.as_str()).unwrap();
                         let zkey_file_path = path::Path::new(&zkey_folder).join(zkey_file).to_str().unwrap().to_string();
 
-
-
-                        let mut pub_signals: Vec<String>  = vec![];
-                        if cfg!(feature = "register") {
-                            // pub_signals
-                            // allowed_proof_type = "register";
-                        } else if cfg!(feature = "dsc") {
-                            // allowed_proof_type = "dsc";
-                        } else {
-                            // allowed_proof_type = "disclose";
-                        }
-
-
                         if let Err(e) = set_witness_generated(uuid.clone(), &pool_clone).await {
+                            dbg!(&e);
                             cleanup(&uuid, &pool_clone, e.to_string()).await;
                             return;
                         }
@@ -177,11 +168,13 @@ async fn main() {
                             uuid.clone(),
                             zkey_file_path,
                         )).await {
+                            dbg!(&e);
                             cleanup(&uuid, &pool_clone, e.to_string()).await;
                             return;
                         }
                     },
                     Err(e) => {
+                        dbg!(&e);
                         cleanup(&uuid, &pool_clone, e.to_string()).await;
                         return;
                     }
@@ -195,10 +188,12 @@ async fn main() {
             let uuid = proof_generator.uuid();
 
             if let Err(e) = proof_generator.run(&rapid_snark_path).await {
+                dbg!(&e);
                 cleanup(&uuid, &pool, e.to_string()).await;
                 continue;
             }
             if let Err(e) = update_proof(&uuid, &pool).await {
+                dbg!(&e);
                 cleanup(&uuid, &pool, e.to_string()).await;
                 continue;
             }
