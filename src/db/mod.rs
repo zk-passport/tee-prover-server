@@ -1,16 +1,16 @@
 use serde::{Deserialize, Serialize};
 use sqlx::types::{chrono::Utc, Json};
-use tokio::io;
 
 use crate::{types::ProofType, utils::get_tmp_folder_path};
 pub mod types;
+
+type PublicInputs = Vec<String>;
 
 pub async fn create_proof_status(
     uuid: &String,
     proof_type: &ProofType,
     circuit_name: &str,
     on_chain: bool,
-    public_inputs: &str,
     db: &sqlx::Pool<sqlx::Postgres>,
 ) -> Result<(), String> {
     let proof_type_id: i32 = proof_type.into();
@@ -18,12 +18,8 @@ pub async fn create_proof_status(
 
     let status: i32 = types::Status::Pending.into();
 
-    let public_inputs_json: Json<serde_json::Value> =
-        sqlx::types::Json::decode_from_string(public_inputs)
-            .map_err(|_| "Could not parse public inputs")?;
-
     let _ = sqlx::query(
-        "INSERT INTO proofs (proof_type, request_id, status, created_at, circuit_name, onchain, public_inputs) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+        "INSERT INTO proofs (proof_type, request_id, status, created_at, circuit_name, onchain) VALUES ($1, $2, $3, $4, $5, $6)",
     )
     .bind(proof_type_id)
     .bind(sqlx::types::Uuid::parse_str(&uuid).unwrap())
@@ -31,7 +27,6 @@ pub async fn create_proof_status(
     .bind(now)
     .bind(circuit_name)
     .bind(on_chain)
-    .bind(public_inputs_json)
     .execute(db)
     .await.map_err(|e| {
         dbg!(e);
@@ -65,31 +60,49 @@ pub async fn set_witness_generated(
     }
 }
 
-pub enum UpdateProofError {
-    Sqlx(sqlx::Error),
-    Io(io::Error),
-}
-
-pub async fn update_proof(
-    uuid: &String,
-    db: &sqlx::Pool<sqlx::Postgres>,
-) -> Result<(), UpdateProofError> {
-    let tmp_file_path = std::path::Path::new(&get_tmp_folder_path(&uuid)).join("proof.json");
+pub async fn update_proof(uuid: &String, db: &sqlx::Pool<sqlx::Postgres>) -> Result<(), String> {
+    let proof_file_path = std::path::Path::new(&get_tmp_folder_path(&uuid)).join("proof.json");
+    let public_inputs_file_path =
+        std::path::Path::new(&get_tmp_folder_path(&uuid)).join("public_inputs.json");
 
     //remove the unwrap here later
-    let proof_string = match std::fs::read_to_string(tmp_file_path) {
+    let proof_string = match std::fs::read_to_string(&proof_file_path) {
         Ok(proof_string) => proof_string,
         Err(e) => {
             dbg!(&e);
-            return Err(UpdateProofError::Io(e));
+            return Err(format!(
+                "Could not read proof from path: {}",
+                proof_file_path.display(),
+            ));
         }
     };
+
+    let public_inputs_string = match std::fs::read_to_string(&public_inputs_file_path) {
+        Ok(public_inputs_string) => public_inputs_string,
+        Err(e) => {
+            dbg!(&e);
+            return Err(format!(
+                "Could not read public inputs from path: {}",
+                public_inputs_file_path.display(),
+            ));
+        }
+    };
+
     let mut proof_reader = serde_json::de::Deserializer::from_str(&proof_string);
 
     let proof = match Proof::deserialize(&mut proof_reader) {
         Ok(proof) => proof,
-        Err(_) => {
-            panic!("error");
+        Err(e) => {
+            return Err(format!("Could not deserialize proof: {}", e));
+        }
+    };
+
+    let mut public_inputs_reader = serde_json::de::Deserializer::from_str(&public_inputs_string);
+
+    let public_inputs = match PublicInputs::deserialize(&mut public_inputs_reader) {
+        Ok(public_inputs) => public_inputs,
+        Err(e) => {
+            return Err(format!("Could not deserialize public inputs: {}", e));
         }
     };
 
@@ -97,34 +110,38 @@ pub async fn update_proof(
 
     let now = Utc::now();
     match sqlx::query(
-        "UPDATE proofs SET proof = $1, status = $2, proof_generated_at = $3  WHERE request_id = $4",
+        "UPDATE proofs SET proof = $1, status = $2, proof_generated_at = $3, public_inputs = $4  WHERE request_id = $5",
     )
     .bind(sqlx::types::Json(proof))
     .bind(status)
     .bind(now)
+    .bind(public_inputs)
     .bind(sqlx::types::Uuid::parse_str(&uuid).unwrap())
     .execute(db)
     .await
     {
         Ok(_) => Ok(()),
         Err(e) => {
-            dbg!(&e);
-            return Err(UpdateProofError::Sqlx(e));
+            return Err(format!("Could not update proof: {}", e));
         }
     }
 }
 
-pub async fn fail_proof(uuid: &String, db: &sqlx::Pool<sqlx::Postgres>) -> Result<(), sqlx::Error> {
+pub async fn fail_proof(
+    uuid: &String,
+    db: &sqlx::Pool<sqlx::Postgres>,
+    reason: String,
+) -> Result<(), sqlx::Error> {
     let status: i32 = types::Status::Failed.into();
-    match sqlx::query("UPDATE proofs SET status = $1 WHERE request_id = $2")
+    match sqlx::query("UPDATE proofs SET status = $1, reason = $2 WHERE request_id = $3")
         .bind(status)
+        .bind(reason)
         .bind(sqlx::types::Uuid::parse_str(&uuid).unwrap())
         .execute(db)
         .await
     {
         Ok(_) => Ok(()),
         Err(e) => {
-            dbg!(&e);
             return Err(e);
         }
     }

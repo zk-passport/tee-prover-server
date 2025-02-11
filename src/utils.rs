@@ -1,10 +1,11 @@
+use std::io;
+
+use crate::db::fail_proof;
 use aes_gcm::aead::Aead;
 use aes_gcm::{Aes256Gcm, Key, KeyInit, Nonce};
 use aws_nitro_enclaves_nsm_api::api::{ErrorCode, Request, Response};
 use aws_nitro_enclaves_nsm_api::driver::nsm_process_request;
 use serde_bytes::ByteBuf;
-
-use crate::db::fail_proof;
 
 pub fn decrypt(
     key: [u8; 32],
@@ -54,8 +55,8 @@ pub fn get_attestation(
     }
 }
 
-pub async fn cleanup(uuid: &String, pool: &sqlx::Pool<sqlx::Postgres>) {
-    let _ = fail_proof(&uuid, &pool).await;
+pub async fn cleanup(uuid: &String, pool: &sqlx::Pool<sqlx::Postgres>, reason: String) {
+    let _ = fail_proof(&uuid, &pool, reason).await;
     let tmp_folder = get_tmp_folder_path(&uuid);
     let _ = tokio::fs::remove_dir_all(tmp_folder).await;
 }

@@ -2,6 +2,7 @@ use aws_nitro_enclaves_nsm_api::api::{ErrorCode, Request, Response};
 use aws_nitro_enclaves_nsm_api::driver::nsm_process_request;
 use jsonrpsee::core::async_trait;
 use jsonrpsee::proc_macros::rpc;
+use jsonrpsee::types;
 use jsonrpsee::{types::ErrorObjectOwned, ResponsePayload};
 use ring::agreement::{agree_ephemeral, EphemeralPrivateKey, UnparsedPublicKey, ECDH_P256};
 use ring::rand::SystemRandom;
@@ -77,7 +78,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
     ) -> ResponsePayload<'static, HelloResponse> {
         if user_pubkey.len() != 65 {
             return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
-                404, //BAD_REQUEST
+                types::ErrorCode::InvalidRequest.code(), //BAD_REQUEST
                 "Public key must be 65 bytes",
                 None,
             ));
@@ -89,7 +90,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
             Ok(key) => key,
             Err(_) => {
                 return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
-                    500, //INTERNAL_SERVER_ERROR
+                    types::ErrorCode::InternalError.code(), //INTERNAL_SERVER_ERROR
                     "Failed to generate ephemeral key",
                     None,
                 ));
@@ -100,7 +101,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
             Ok(pubkey) => pubkey,
             Err(_) => {
                 return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
-                    500, //INTERNAL_SERVER_ERROR
+                    types::ErrorCode::InternalError.code(), //INTERNAL_SERVER_ERROR
                     "Failed to generate ephemeral key",
                     None,
                 ));
@@ -118,7 +119,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
             Ok(attestation) => attestation,
             Err(err) => {
                 return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
-                    500, //INTERNAL_SERVER_ERROR
+                    types::ErrorCode::InternalError.code(), //INTERNAL_SERVER_ERROR
                     format!("{:?}", err),
                     None,
                 ));
@@ -134,7 +135,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
                 Ok(shared_secret) => shared_secret,
                 Err(_) => {
                     return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
-                        500, //INTERNAL_SERVER_ERROR
+                        types::ErrorCode::InternalError.code(), //INTERNAL_SERVER_ERROR
                         "Failed to generate ephemeral key",
                         None,
                     ));
@@ -148,7 +149,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
         {
             Ok(_) => {
                 return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
-                    403, //BAD REQUEST
+                    types::ErrorCode::InvalidRequest.code(), //BAD REQUEST
                     "Request ID already exists",
                     None,
                 ));
@@ -160,7 +161,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
             Ok(store) => store,
             Err(_) => {
                 return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
-                    500, // INTERNAL_SERVER_ERROR
+                    types::ErrorCode::InternalError.code(), // INTERNAL_SERVER_ERROR
                     "Failed to store ephemeral key",
                     None,
                 ));
@@ -171,7 +172,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
             Ok(_) => (),
             Err(_) => {
                 return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
-                    500, //INTERNAL_SERVER_ERROR
+                    types::ErrorCode::InternalError.code(), //INTERNAL_SERVER_ERROR
                     "Failed to store ephemeral key",
                     None,
                 ));
@@ -199,7 +200,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
                 Ok(store) => store,
                 Err(_) => {
                     return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
-                        500, // INTERNAL_SERVER_ERROR
+                        types::ErrorCode::InternalError.code(), //INTERNAL_SERVER_ERROR
                         "Failed to store ephemeral key",
                         None,
                     ));
@@ -210,7 +211,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
                 Some(shared_secret) => shared_secret,
                 None => {
                     return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
-                        404, // NOT_FOUND
+                        types::ErrorCode::InvalidRequest.code(),
                         "UUID not found",
                         None,
                     ));
@@ -223,7 +224,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
             Ok(key) => key,
             Err(_) => {
                 return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
-                    500, //INTERNAL_SERVER_ERROR
+                    types::ErrorCode::InternalError.code(), //INTERNAL_SERVER_ERROR
                     "Failed to store ephemeral key",
                     None,
                 ));
@@ -232,11 +233,11 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
 
         let decrypted_text = match utils::decrypt(key, cipher_text, auth_tag, nonce) {
             Ok(text) => text,
-            Err(e) => {
+            Err(_) => {
                 return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
-                    404,
-                    e,
-                    Some("Failed to decrypt text".to_string()),
+                    types::ErrorCode::InvalidRequest.code(),
+                    "Failed to decrypt text",
+                    None,
                 ));
             }
         };
@@ -246,7 +247,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
                 let circuit_name = proof_request_type.circuit().name.clone();
                 if !self.circuit_zkey_map.contains_key(&circuit_name) {
                     return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
-                        404,
+                        types::ErrorCode::InvalidRequest.code(),
                         format!("Could not find the given circuit name: {}", &circuit_name),
                         None,
                     ));
@@ -255,7 +256,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
             }
             Err(_) => {
                 return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
-                    404,
+                    types::ErrorCode::InvalidRequest.code(),
                     "Failed to parse proof request",
                     None,
                 ));
@@ -273,7 +274,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
 
         let invalid_proof_type_response =
             ResponsePayload::error(ErrorObjectOwned::owned::<String>(
-                403, //BAD REQUEST
+                types::ErrorCode::InvalidRequest.code(), //BAD REQUEST
                 format!("This endpoint only allows {} inputs", allowed_proof_type),
                 None,
             ));
@@ -305,7 +306,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
             Ok(()) => (),
             Err(e) => {
                 return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
-                    500, //INTERNAL_SERVER_ERROR
+                    types::ErrorCode::InternalError.code(), //INTERNAL_SERVER_ERROR
                     e.to_string(),
                     None,
                 ));
@@ -330,13 +331,13 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
         let result = match nsm_process_request(self.fd, request) {
             Response::Attestation { document } => ResponsePayload::success(document),
             Response::Error(err) => ResponsePayload::error(ErrorObjectOwned::owned::<String>(
-                500, //INTERNAL_SERVER_ERROR
+                types::ErrorCode::InternalError.code(), //INTERNAL_SERVER_ERROR
                 format!("{:?}", err),
                 None,
             )),
             _ => {
                 return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
-                    500, //INTERNAL_SERVER_ERROR
+                    types::ErrorCode::InternalError.code(), //INTERNAL_SERVER_ERROR
                     format!("{:?}", ErrorCode::InvalidResponse),
                     None,
                 ));

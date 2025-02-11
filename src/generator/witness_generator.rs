@@ -37,8 +37,8 @@ impl WitnessGenerator {
         let output_file = tmp_folder_path + "/output.wtns";
 
         let _ = match tokio::process::Command::new(circuit_exe)
-            .arg(input_file)
-            .arg(output_file)
+            .arg(&input_file)
+            .arg(&output_file)
             .output()
             .await
         {

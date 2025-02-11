@@ -109,10 +109,9 @@ async fn main() {
             let proof_type = file_generator.proof_type();
 
             let circuit_name = &file_generator.proof_request.circuit().name;
-            let public_inputs = &file_generator.proof_request.circuit().public_inputs;
 
-            if let Err(_) = create_proof_status(&uuid, &proof_type, circuit_name, onchain, public_inputs, &pool).await {
-                let _ = fail_proof(&uuid, &pool).await;
+            if let Err(e) = create_proof_status(&uuid, &proof_type, circuit_name, onchain, &pool).await {
+                let _ = fail_proof(&uuid, &pool, e.to_string()).await;
                 continue;
             }
 
@@ -121,16 +120,16 @@ async fn main() {
             tokio::spawn(async move {
                 let (uuid, circuit_name) = match file_generator.run().await {
                     Ok((uuid, circuit_name)) => (uuid, circuit_name),
-                    Err(_) => {
-                        cleanup(&uuid, &pool_clone).await;
+                    Err(e) => {
+                        cleanup(&uuid, &pool_clone, e.to_string()).await;
                         return;
                     }
                 };
-                if let Err(_) = witness_generator_clone.send(WitnessGenerator::new(
+                if let Err(e) = witness_generator_clone.send(WitnessGenerator::new(
                     uuid.clone(),
                     circuit_name
                 )).await {
-                    cleanup(&uuid, &pool_clone).await;
+                    cleanup(&uuid, &pool_clone, e.to_string()).await;
                     return;
                 }
             });
@@ -155,16 +154,35 @@ async fn main() {
                     Ok((uuid, circuit_name)) => {
                         let zkey_file = circuit_zkey_map_arc_clone.get(circuit_name.as_str()).unwrap();
                         let zkey_file_path = path::Path::new(&zkey_folder).join(zkey_file).to_str().unwrap().to_string();
-                        if let Err(_) = proof_generator_sender_clone.send(ProofGenerator::new(
+
+
+
+                        let mut pub_signals: Vec<String>  = vec![];
+                        if cfg!(feature = "register") {
+                            // pub_signals
+                            // allowed_proof_type = "register";
+                        } else if cfg!(feature = "dsc") {
+                            // allowed_proof_type = "dsc";
+                        } else {
+                            // allowed_proof_type = "disclose";
+                        }
+
+
+                        if let Err(e) = set_witness_generated(uuid.clone(), &pool_clone).await {
+                            cleanup(&uuid, &pool_clone, e.to_string()).await;
+                            return;
+                        }
+
+                        if let Err(e) = proof_generator_sender_clone.send(ProofGenerator::new(
                             uuid.clone(),
                             zkey_file_path,
                         )).await {
-                            cleanup(&uuid, &pool_clone).await;
+                            cleanup(&uuid, &pool_clone, e.to_string()).await;
                             return;
                         }
                     },
-                    Err(_) => {
-                        cleanup(&uuid, &pool_clone).await;
+                    Err(e) => {
+                        cleanup(&uuid, &pool_clone, e.to_string()).await;
                         return;
                     }
                 }
@@ -175,16 +193,13 @@ async fn main() {
     _ = async {
         while let Some(proof_generator) = proof_generator_receiver.recv().await {
             let uuid = proof_generator.uuid();
-            if let Err(_) = set_witness_generated(uuid.clone(), &pool).await {
-                cleanup(&uuid, &pool).await;
+
+            if let Err(e) = proof_generator.run(&rapid_snark_path).await {
+                cleanup(&uuid, &pool, e.to_string()).await;
                 continue;
             }
-            if let Err(_) = proof_generator.run(&rapid_snark_path).await {
-                cleanup(&uuid, &pool).await;
-                continue;
-            }
-            if let Err(_) = update_proof(&uuid, &pool).await {
-                cleanup(&uuid, &pool).await;
+            if let Err(e) = update_proof(&uuid, &pool).await {
+                cleanup(&uuid, &pool, e.to_string()).await;
                 continue;
             }
             let tmp_folder = get_tmp_folder_path(&uuid);

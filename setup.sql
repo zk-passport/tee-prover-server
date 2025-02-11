@@ -8,7 +8,9 @@ CREATE TABLE IF NOT EXISTS proofs (
     witness_generated_at TIMESTAMP WITH TIME ZONE,
     proof_generated_at TIMESTAMP WITH TIME ZONE, 
     proof JSON,
-    public_inputs JSON
+    public_inputs JSON, 
+    reason TEXT, 
+    identifier VARCHAR(255)
 );
 
 CREATE OR REPLACE FUNCTION status_update_notify() RETURNS trigger AS $$
@@ -27,6 +29,8 @@ BEGIN
       'proof_generated_at', NEW.proof_generated_at,
       'proof', NEW.proof, 
       'public_inputs', NEW.public_inputs
+      'reason', NEW.reason
+      'identifier', NEW.identifier
     );
 
     PERFORM pg_notify('status_update', notification_payload::text);

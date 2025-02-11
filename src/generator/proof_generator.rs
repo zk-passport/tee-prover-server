@@ -33,10 +33,6 @@ impl ProofGenerator {
         let public_inputs = get_tmp_folder_path(&self.uuid);
         let public_inputs = path::Path::new(&public_inputs).join("public_inputs.json");
 
-        if !public_inputs.exists() {
-            return Err("Public inputs file does not exist".to_string());
-        }
-
         match tokio::process::Command::new(format!("./{}", rapid_snark_path_exe))
             .arg(&self.zkey_file_path)
             .arg(witness_file_path)
