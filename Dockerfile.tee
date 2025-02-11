@@ -24,8 +24,25 @@ RUN ./build_witnesscalc.sh $PROOFTYPE /self /circuits
 
 FROM public.ecr.aws/docker/library/debian:12.6-slim@sha256:2ccc7e39b0a6f504d252f807da1fc4b5bcd838e83e4dec3e2f57b2a4a64e7214
 
-RUN apt-get update
-RUN apt-get install build-essential cmake libgmp-dev libsodium-dev nasm curl m4 netcat-traditional socat iproute2 git jq unzip -y
+RUN apt-get update \
+    && apt-get install -y \
+    build-essential \
+    cmake \
+    libgmp-dev \
+    libsodium-dev \
+    nasm \
+    curl \
+    m4 \
+    netcat-traditional \
+    socat \
+    iproute2 \
+    git \
+    jq \
+    unzip \
+    wget \
+    zstd \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /rapidsnark
 COPY ./rapidsnark .
@@ -35,11 +52,11 @@ RUN ./build_gmp.sh host && \
     make -j16 && make install
 
 COPY start.sh /usr/local/bin
-RUN chown root:root /usr/local/bin/start.sh
-RUN chmod 755 /usr/local/bin/start.sh
+RUN chown root:root /usr/local/bin/start.sh && \
+    chmod 755 /usr/local/bin/start.sh
 
 COPY --from=rust-builder /src/target/release/tee-server /usr/local/bin/
 COPY --from=circuit-builder /circuits /circuits
-COPY ./zkeys /zkeys 
+# COPY ./zkeys /zkeys
 
 CMD ["/usr/local/bin/start.sh"]
