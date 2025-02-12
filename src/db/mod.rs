@@ -142,6 +142,7 @@ pub async fn fail_proof(
     {
         Ok(_) => Ok(()),
         Err(e) => {
+            dbg!(&e);
             return Err(e);
         }
     }
