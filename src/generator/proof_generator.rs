@@ -1,3 +1,4 @@
+use core::str;
 use std::path;
 
 use crate::utils::get_tmp_folder_path;
@@ -43,7 +44,9 @@ impl ProofGenerator {
         {
             Ok(output) => {
                 if !output.status.success() || output.stderr.len() > 0 {
-                    return Err("Proof failed".to_string());
+                    return Err(str::from_utf8(&output.stderr)
+                        .unwrap_or("Proof failed")
+                        .to_string());
                 }
             }
             Err(err) => {

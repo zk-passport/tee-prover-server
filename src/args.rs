@@ -23,10 +23,6 @@ pub struct Config {
     #[arg(short = 'k', long, default_value = "./zkeys")]
     pub zkey_folder: String,
 
-    /// Witness calc circuit to zkey mapper
-    #[arg(short = 'z', long)]
-    pub circuit_zkey_map: Vec<KeyValuePair>,
-
     /// Rapidsnark path
     #[arg(short = 'r', long, default_value = "./rapidsnark")]
     pub rapidsnark_path: String,

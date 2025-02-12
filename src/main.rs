@@ -53,25 +53,24 @@ async fn main() {
     let zkey_folder = config.zkey_folder;
 
     let mut circuit_zkey_map = HashMap::new();
-    for pair in config.circuit_zkey_map.iter() {
-        circuit_zkey_map.insert(pair.0.clone(), pair.1.clone());
-    }
 
-    for (key, value) in circuit_zkey_map.iter() {
-        //check if these zkey paths exist
-        let zkey_path = path::Path::new(&zkey_folder).join(value);
+    let entries = std::fs::read_dir(std::path::Path::new(&circuit_folder)).unwrap();
+
+    for entry in entries {
+        let entry = entry.unwrap().path();
+        let dir_name = entry.file_name().unwrap();
+        let cpp_folder = dir_name.to_str().unwrap();
+        //assuming that the folder ends with "_cpp"
+        let circuit_name = cpp_folder[0..cpp_folder.len() - 4].to_string();
+
+        let zkey_path = path::Path::new(&zkey_folder).join(format!("{}.zkey", circuit_name));
+        let zkey_path_str = zkey_path.to_str().unwrap();
+
         if !zkey_path.exists() {
-            let zkey_path_str = zkey_path.to_str().unwrap();
             panic!("zkey {zkey_path_str} does not exist!");
         }
 
-        let circuit_path = path::Path::new(&circuit_folder)
-            .join(format!("{}_cpp", key))
-            .join(key);
-        if !circuit_path.exists() {
-            let circuit_path_str = circuit_path.to_str().unwrap();
-            panic!("circuit {circuit_path_str} does not exist!");
-        }
+        circuit_zkey_map.insert(circuit_name, zkey_path_str.to_string());
     }
 
     let circuit_zkey_map_arc = Arc::new(circuit_zkey_map);

@@ -40,10 +40,17 @@ jobs:
             -o artifact.zip \
             "$ARTIFACT_URL"
 
-      - name: Download and unpack zkeys
+      # - name: Download and unpack zkeys
+      #   run: |
+      #     curl -L -o zkeys.tar.zst https://self-protocol.s3.eu-west-1.amazonaws.com/zkeys/zkeys.tar.zst
+      #     tar --zstd -xf zkeys.tar.zst
+
+      - name: Reformat zkeys
         run: |
-          curl -L -o zkeys.tar.zst https://self-protocol.s3.eu-west-1.amazonaws.com/zkeys/zkeys.tar.zst
-          tar --zstd -xf zkeys.tar.zst
+          mkdir -p zkeys/register zkeys/disclose zkeys/dsc
+          mv zkeys/register_* zkeys/register/
+          mv zkeys/vc_and_disclose.zkey zkeys/disclose/ 
+          mv zkeys/dsc_* zkeys/dsc/
 
       - name: Init submodules
         run: |
@@ -57,14 +64,14 @@ jobs:
       - name: Build Docker image
         run: |
           sudo docker build --build-arg PROOFTYPE=register -f Dockerfile.tee.actions -t nesopie/tee-server-register:latest .
-          # sudo docker build --build-arg PROOFTYPE=disclose -f Dockerfile.tee.actions -t nesopie/tee-server-disclose:latest .
-          # sudo docker build --build-arg PROOFTYPE=dsc      -f Dockerfile.tee.actions -t nesopie/tee-server-dsc:latest .
+          sudo docker build --build-arg PROOFTYPE=disclose -f Dockerfile.tee.actions -t nesopie/tee-server-disclose:latest .
+          sudo docker build --build-arg PROOFTYPE=dsc      -f Dockerfile.tee.actions -t nesopie/tee-server-dsc:latest .
 
       - name: Push docker images
         run: |
           sudo docker push nesopie/tee-server-register:latest
-          # sudo docker push nesopie/tee-server-disclose:latest
-          # sudo docker push nesopie/tee-server-dsc:latest
+          sudo docker push nesopie/tee-server-disclose:latest
+          sudo docker push nesopie/tee-server-dsc:latest
 
       # build the eif
       - name: Build eifs
@@ -74,8 +81,8 @@ jobs:
           touch measurements/disclose.log && sudo chmod 777 measurements/disclose.log
           touch measurements/dsc.log && sudo chmod 777 measurements/dsc.log
           sudo nitro-cli build-enclave --docker-uri ${{ secrets.DOCKER_USERNAME }}/tee-server-register --output-file prover-server-register.eif > measurements/register.log 2>&1
-          # sudo nitro-cli build-enclave --docker-uri ${{ secrets.DOCKER_USERNAME }}/tee-server-disclose --output-file prover-server-disclose.eif > measurements/disclose.log 2>&1
-          # sudo nitro-cli build-enclave --docker-uri ${{ secrets.DOCKER_USERNAME }}/tee-server-dsc --output-file prover-server-dsc.eif > measurements/dsc.log 2>&1
+          sudo nitro-cli build-enclave --docker-uri ${{ secrets.DOCKER_USERNAME }}/tee-server-disclose --output-file prover-server-disclose.eif > measurements/disclose.log 2>&1
+          sudo nitro-cli build-enclave --docker-uri ${{ secrets.DOCKER_USERNAME }}/tee-server-dsc --output-file prover-server-dsc.eif > measurements/dsc.log 2>&1
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
