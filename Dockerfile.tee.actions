@@ -28,6 +28,6 @@ WORKDIR /
 COPY artifact.zip artifact.zip
 RUN unzip artifact.zip -d /all-circuits
 RUN mv /all-circuits/$PROOFTYPE /circuits
-COPY ./zkeys /zkeys 
+COPY ./zkeys/$PROOFTYPE /zkeys
 
 CMD ["/usr/local/bin/start.sh"]
