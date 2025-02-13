@@ -143,7 +143,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
 
         drop(store);
 
-        ResponsePayload::success(HelloResponse::new(uuid, my_public_key).into())
+        ResponsePayload::success(HelloResponse::new(uuid, attestation).into())
     }
 
     //TODO: check if circuit exists

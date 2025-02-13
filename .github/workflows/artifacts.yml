@@ -63,9 +63,9 @@ jobs:
 
       - name: Build Docker image
         run: |
-          sudo docker build --build-arg PROOFTYPE=register -f Dockerfile.tee.actions -t nesopie/tee-server-register:latest .
-          sudo docker build --build-arg PROOFTYPE=disclose -f Dockerfile.tee.actions -t nesopie/tee-server-disclose:latest .
-          sudo docker build --build-arg PROOFTYPE=dsc      -f Dockerfile.tee.actions -t nesopie/tee-server-dsc:latest .
+          sudo docker build --build-arg PROOFTYPE=register -f Dockerfile.tee -t nesopie/tee-server-register:latest .
+          sudo docker build --build-arg PROOFTYPE=disclose -f Dockerfile.tee -t nesopie/tee-server-disclose:latest .
+          sudo docker build --build-arg PROOFTYPE=dsc      -f Dockerfile.tee -t nesopie/tee-server-dsc:latest .
 
       - name: Push docker images
         run: |
