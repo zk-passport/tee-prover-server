@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS proofs (
     witness_generated_at TIMESTAMP WITH TIME ZONE,
     proof_generated_at TIMESTAMP WITH TIME ZONE, 
     proof JSON,
+    endpoint_type VARCHAR(128),
+    endpoint VARCHAR(128),
     public_inputs TEXT[],
     reason TEXT, 
     identifier VARCHAR(255)
@@ -28,6 +30,8 @@ BEGIN
       'witness_generated_at', NEW.witness_generated_at,
       'proof_generated_at', NEW.proof_generated_at,
       'proof', NEW.proof, 
+      'endpoint_type', NEW.endpoint_type,
+      'endpoint', NEW.endpoint,
       'public_inputs', NEW.public_inputs,
       'reason', NEW.reason,
       'identifier', NEW.identifier

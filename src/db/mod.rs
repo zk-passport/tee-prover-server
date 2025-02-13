@@ -1,7 +1,10 @@
 use serde::{Deserialize, Serialize};
 use sqlx::types::{chrono::Utc, Json};
 
-use crate::{types::ProofType, utils::get_tmp_folder_path};
+use crate::{
+    types::{EndpointType, ProofType},
+    utils::get_tmp_folder_path,
+};
 pub mod types;
 
 type PublicInputs = Vec<String>;
@@ -12,6 +15,8 @@ pub async fn create_proof_status(
     circuit_name: &str,
     on_chain: bool,
     db: &sqlx::Pool<sqlx::Postgres>,
+    endpoint_type: Option<&EndpointType>,
+    endpoint: Option<&String>,
 ) -> Result<(), String> {
     let proof_type_id: i32 = proof_type.into();
     let now = Utc::now();
@@ -19,7 +24,7 @@ pub async fn create_proof_status(
     let status: i32 = types::Status::Pending.into();
 
     let _ = sqlx::query(
-        "INSERT INTO proofs (proof_type, request_id, status, created_at, circuit_name, onchain) VALUES ($1, $2, $3, $4, $5, $6)",
+        "INSERT INTO proofs (proof_type, request_id, status, created_at, circuit_name, onchain, endpoint_type, endpoint) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
     )
     .bind(proof_type_id)
     .bind(sqlx::types::Uuid::parse_str(&uuid).unwrap())
@@ -27,6 +32,8 @@ pub async fn create_proof_status(
     .bind(now)
     .bind(circuit_name)
     .bind(on_chain)
+    .bind(endpoint_type.map(|e| serde_json::to_string(e).unwrap()))
+    .bind(endpoint)
     .execute(db)
     .await.map_err(|e| {
         dbg!(e);

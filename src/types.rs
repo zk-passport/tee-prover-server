@@ -21,7 +21,22 @@ impl<'a> Into<ResponsePayload<'a, HelloResponse>> for HelloResponse {
     }
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SubmitRequest {
+    pub onchain: bool,
+    #[serde(flatten)]
+    pub proof_request_type: ProofRequest,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "lowercase")]
+pub enum EndpointType {
+    Celo,
+    Https,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum ProofRequest {
     #[serde(rename_all = "camelCase")]
@@ -29,7 +44,11 @@ pub enum ProofRequest {
     #[serde(rename_all = "camelCase")]
     Dsc { circuit: Circuit },
     #[serde(rename_all = "camelCase")]
-    Disclose { circuit: Circuit },
+    Disclose {
+        circuit: Circuit,
+        endpoint_type: EndpointType,
+        endpoint: String,
+    },
 }
 
 impl ProofRequest {
@@ -37,7 +56,7 @@ impl ProofRequest {
         match self {
             ProofRequest::Register { circuit } => circuit,
             ProofRequest::Dsc { circuit } => circuit,
-            ProofRequest::Disclose { circuit } => circuit,
+            ProofRequest::Disclose { circuit, .. } => circuit,
         }
     }
 }

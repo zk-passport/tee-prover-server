@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use aws_nitro_enclaves_nsm_api::driver::{nsm_exit, nsm_init};
 use clap::Parser;
-use db::{create_proof_status, fail_proof, set_witness_generated, update_proof};
+use db::{set_witness_generated, update_proof};
 use generator::{proof_generator::ProofGenerator, witness_generator::WitnessGenerator};
 use jsonrpsee::server::Server;
 use server::RpcServer;
@@ -103,17 +103,8 @@ async fn main() {
         }
 
     _ = async {
-        while let Some((onchain, file_generator)) = file_generator_receiver.recv().await {
+        while let Some(file_generator) = file_generator_receiver.recv().await {
             let uuid = file_generator.uuid();
-            let proof_type = file_generator.proof_type();
-
-            let circuit_name = &file_generator.proof_request.circuit().name;
-
-            if let Err(e) = create_proof_status(&uuid, &proof_type, circuit_name, onchain, &pool).await {
-                dbg!(&e);
-                let _ = fail_proof(&uuid, &pool, e.to_string()).await;
-                continue;
-            }
 
             let pool_clone = pool.clone();
             let witness_generator_clone = witness_generator_sender.clone();

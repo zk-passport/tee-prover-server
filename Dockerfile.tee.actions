@@ -25,10 +25,11 @@ ARG PROOFTYPE=${PROOFTYPE}
 
 COPY --from=rust-builder /src/target/release/tee-server /usr/local/bin/
 WORKDIR /
-COPY artifact.zip artifact.zip
-RUN unzip artifact.zip -d /all-circuits && \
-    mv /all-circuits/$PROOFTYPE /circuits && \
-    rm -rf /artifact.zip /all-circuits
+COPY ./circuits /circuits
+# COPY artifact.zip artifact.zip
+# RUN unzip artifact.zip -d /all-circuits && \
+#     mv /all-circuits/$PROOFTYPE /circuits && \
+#     rm -rf /artifact.zip /all-circuits
 
 COPY ./zkeys/$PROOFTYPE /zkeys
 
