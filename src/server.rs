@@ -9,7 +9,6 @@ use ring::rand::SystemRandom;
 use serde_bytes::ByteBuf;
 use sqlx::{Pool, Postgres};
 use std::collections::HashMap;
-use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
 use crate::store::Store;
@@ -48,7 +47,6 @@ pub struct RpcServerImpl<S> {
     store: Arc<Mutex<S>>,
     file_generator_sender: tokio::sync::mpsc::Sender<(bool, FileGenerator)>,
     circuit_zkey_map: Arc<HashMap<String, String>>,
-    db: Pool<Postgres>,
 }
 
 impl<S> RpcServerImpl<S> {
@@ -57,14 +55,12 @@ impl<S> RpcServerImpl<S> {
         store: S,
         file_generator_sender: tokio::sync::mpsc::Sender<(bool, FileGenerator)>,
         circuit_zkey_map: Arc<HashMap<String, String>>,
-        db: Pool<Postgres>,
     ) -> Self {
         Self {
             fd,
             store: Arc::new(Mutex::new(store)),
             file_generator_sender,
             circuit_zkey_map,
-            db,
         }
     }
 }
