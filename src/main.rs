@@ -108,9 +108,9 @@ async fn main() {
 
             let circuit_name = &file_generator.proof_request.circuit().name;
 
-            if let Err(e) = create_proof_status(&uuid, &proof_type, circuit_name, onchain, &pool).await {
+            if let Err(e) = create_proof_status(uuid.clone(), &proof_type, circuit_name, onchain, &pool).await {
                 dbg!(&e);
-                let _ = fail_proof(&uuid, &pool, e.to_string()).await;
+                let _ = fail_proof(uuid.clone(), &pool, e.to_string()).await;
                 continue;
             }
 
@@ -121,7 +121,7 @@ async fn main() {
                     Ok((uuid, circuit_name)) => (uuid, circuit_name),
                     Err(e) => {
                         dbg!(&e);
-                        cleanup(&uuid, &pool_clone, e.to_string()).await;
+                        cleanup(uuid.clone(), &pool_clone, e.to_string()).await;
                         return;
                     }
                 };
@@ -130,7 +130,7 @@ async fn main() {
                     circuit_name
                 )).await {
                     dbg!(&e);
-                    cleanup(&uuid, &pool_clone, e.to_string()).await;
+                    cleanup(uuid, &pool_clone, e.to_string()).await;
                     return;
                 }
             });
@@ -158,7 +158,7 @@ async fn main() {
 
                         if let Err(e) = set_witness_generated(uuid.clone(), &pool_clone).await {
                             dbg!(&e);
-                            cleanup(&uuid, &pool_clone, e.to_string()).await;
+                            cleanup(uuid.clone(), &pool_clone, e.to_string()).await;
                             return;
                         }
 
@@ -167,13 +167,13 @@ async fn main() {
                             zkey_file_path,
                         )).await {
                             dbg!(&e);
-                            cleanup(&uuid, &pool_clone, e.to_string()).await;
+                            cleanup(uuid.clone(), &pool_clone, e.to_string()).await;
                             return;
                         }
                     },
                     Err(e) => {
                         dbg!(&e);
-                        cleanup(&uuid, &pool_clone, e.to_string()).await;
+                        cleanup(uuid.clone(), &pool_clone, e.to_string()).await;
                         return;
                     }
                 }
@@ -187,15 +187,15 @@ async fn main() {
 
             if let Err(e) = proof_generator.run(&rapid_snark_path).await {
                 dbg!(&e);
-                cleanup(&uuid, &pool, e.to_string()).await;
+                cleanup(uuid.clone(), &pool, e.to_string()).await;
                 continue;
             }
-            if let Err(e) = update_proof(&uuid, &pool).await {
+            if let Err(e) = update_proof(uuid.clone(), &pool).await {
                 dbg!(&e);
-                cleanup(&uuid, &pool, e.to_string()).await;
+                cleanup(uuid.clone(), &pool, e.to_string()).await;
                 continue;
             }
-            let tmp_folder = get_tmp_folder_path(&uuid);
+            let tmp_folder = get_tmp_folder_path(&uuid.to_string());
             let _ = tokio::fs::remove_dir_all(tmp_folder).await;
         }
     } => {}

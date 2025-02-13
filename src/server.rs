@@ -10,6 +10,7 @@ use rand_core::{CryptoRng, OsRng, RngCore};
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::io;
+use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
 use crate::store::Store;
@@ -81,8 +82,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
             ));
         };
 
-        // let mut nitro_rng = NitroRng::new(self.fd);
-        let mut nitro_rng = OsRng;
+        let mut nitro_rng = NitroRng::new(self.fd);
 
         let my_private_key = EphemeralSecret::random(&mut nitro_rng);
         let my_public_key = PublicKey::from(&my_private_key).to_sec1_bytes().to_vec();
@@ -259,7 +259,18 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
             }
         };
 
-        let file_generator = FileGenerator::new(uuid.clone(), proof_request_type);
+        let uuid = match uuid::Uuid::from_str(&uuid) {
+            Ok(uuid) => uuid,
+            Err(_) => {
+                return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
+                    types::ErrorCode::InvalidRequest.code(),
+                    "Failed to parse uuid",
+                    None,
+                ));
+            }
+        };
+
+        let file_generator = FileGenerator::new(uuid, proof_request_type);
         match self
             .file_generator_sender
             .send((onchain, file_generator))
@@ -275,7 +286,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
             }
         }
 
-        ResponsePayload::success(uuid)
+        ResponsePayload::success(uuid.to_string())
     }
 
     async fn attestation(

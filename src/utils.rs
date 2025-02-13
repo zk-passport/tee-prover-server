@@ -53,9 +53,9 @@ pub fn get_attestation(
     }
 }
 
-pub async fn cleanup(uuid: &String, pool: &sqlx::Pool<sqlx::Postgres>, reason: String) {
-    let _ = fail_proof(&uuid, &pool, reason).await;
-    let tmp_folder = get_tmp_folder_path(&uuid);
+pub async fn cleanup(uuid: uuid::Uuid, pool: &sqlx::Pool<sqlx::Postgres>, reason: String) {
+    let tmp_folder = get_tmp_folder_path(&uuid.to_string());
+    let _ = fail_proof(uuid, &pool, reason).await;
     let _ = tokio::fs::remove_dir_all(tmp_folder).await;
 }
 
