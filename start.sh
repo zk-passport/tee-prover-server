@@ -22,5 +22,4 @@ echo $DATABASE_URL
     --database-url=$DATABASE_URL \
     --circuit-folder=/circuits \
     --zkey-folder=/zkeys \
-    --rapidsnark-path=/rapidsnark   
-
+    --rapidsnark-path=/rapidsnark
