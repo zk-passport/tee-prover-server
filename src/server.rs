@@ -142,21 +142,6 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
                 }
             };
 
-        match sqlx::query("SELECT * from proofs WHERE request_id = $1")
-            .bind(sqlx::types::uuid::Uuid::from_str(uuid.to_string().as_str()).unwrap())
-            .fetch_one(&self.db)
-            .await
-        {
-            Ok(_) => {
-                return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
-                    types::ErrorCode::InvalidRequest.code(), //BAD REQUEST
-                    "Request ID already exists",
-                    None,
-                ));
-            }
-            Err(_) => (),
-        }
-
         let mut store = match self.store.lock() {
             Ok(store) => store,
             Err(_) => {
