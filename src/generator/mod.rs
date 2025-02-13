@@ -2,9 +2,9 @@ pub mod file_generator;
 pub mod proof_generator;
 pub mod witness_generator;
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
-#[derive(Serialize, Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Circuit {
     pub name: String,
     pub inputs: String, //json

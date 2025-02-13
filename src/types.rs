@@ -21,7 +21,7 @@ impl<'a> Into<ResponsePayload<'a, HelloResponse>> for HelloResponse {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SubmitRequest {
     pub onchain: bool,
@@ -29,14 +29,14 @@ pub struct SubmitRequest {
     pub proof_request_type: ProofRequest,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Deserialize, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum EndpointType {
     Celo,
     Https,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Deserialize, Clone)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum ProofRequest {
     #[serde(rename_all = "camelCase")]
