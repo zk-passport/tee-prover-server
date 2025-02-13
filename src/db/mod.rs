@@ -32,7 +32,7 @@ pub async fn create_proof_status(
     .bind(now)
     .bind(circuit_name)
     .bind(on_chain)
-    .bind(endpoint_type.map(|e| serde_json::to_string(e).unwrap()))
+    .bind(endpoint_type.map(|e| serde_plain::to_string(e).unwrap()))
     .bind(endpoint)
     .execute(db)
     .await.map_err(|e| {

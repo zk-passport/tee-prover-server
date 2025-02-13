@@ -1671,6 +1671,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_plain"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ce1fc6db65a611022b23a0dec6975d63fb80a302cb3388835ff02c097258d50"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "serde_urlencoded"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2053,6 +2062,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "serde_json",
+ "serde_plain",
  "sqlx",
  "tokio",
  "uuid",
