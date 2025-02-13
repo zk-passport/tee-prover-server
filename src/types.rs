@@ -29,7 +29,7 @@ pub struct SubmitRequest {
     pub proof_request_type: ProofRequest,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum EndpointType {
     Celo,
