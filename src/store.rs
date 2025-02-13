@@ -5,7 +5,7 @@ pub trait Store {
         &mut self,
         uuid: uuid::Uuid,
         shared_secret: Vec<u8>,
-    ) -> Result<(), ring::error::Unspecified>;
+    ) -> Result<(), String>;
 
     fn get_shared_secret(&self, uuid: &String) -> Option<Vec<u8>>;
 }
@@ -27,9 +27,14 @@ impl Store for HashMapStore {
         &mut self,
         uuid: uuid::Uuid,
         shared_secret: Vec<u8>,
-    ) -> Result<(), ring::error::Unspecified> {
-        self.ecdh_store.insert(uuid.to_string(), shared_secret);
-        Ok(())
+    ) -> Result<(), String> {
+        if self.ecdh_store.contains_key(&uuid.to_string()) {
+            return Err("Duplicate uuid".to_string());
+        } else {
+            self.ecdh_store.insert(uuid.to_string(), shared_secret);
+        }
+
+        return Ok(());
     }
 
     fn get_shared_secret(&self, uuid: &String) -> Option<Vec<u8>> {

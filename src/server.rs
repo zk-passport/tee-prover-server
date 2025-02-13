@@ -4,16 +4,17 @@ use jsonrpsee::core::async_trait;
 use jsonrpsee::proc_macros::rpc;
 use jsonrpsee::types;
 use jsonrpsee::{types::ErrorObjectOwned, ResponsePayload};
-use ring::agreement::{agree_ephemeral, EphemeralPrivateKey, UnparsedPublicKey, ECDH_P256};
-use ring::rand::SystemRandom;
+use p256::ecdh::EphemeralSecret;
+use p256::elliptic_curve::PublicKey;
+use rand_core::{CryptoRng, OsRng, RngCore};
 use serde_bytes::ByteBuf;
-use sqlx::{Pool, Postgres};
 use std::collections::HashMap;
+use std::io;
 use std::sync::{Arc, Mutex};
 
 use crate::store::Store;
 use crate::types::ProofRequest;
-use crate::utils;
+use crate::utils::{self, nsm_get_random};
 use crate::{generator::file_generator::FileGenerator, types::HelloResponse};
 
 #[rpc(server, namespace = "openpassport")]
@@ -80,31 +81,11 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
             ));
         };
 
-        let rng = SystemRandom::new();
+        // let mut nitro_rng = NitroRng::new(self.fd);
+        let mut nitro_rng = OsRng;
 
-        let my_private_key = match EphemeralPrivateKey::generate(&ECDH_P256, &rng) {
-            Ok(key) => key,
-            Err(_) => {
-                return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
-                    types::ErrorCode::InternalError.code(), //INTERNAL_SERVER_ERROR
-                    "Failed to generate ephemeral key",
-                    None,
-                ));
-            }
-        };
-
-        let my_public_key = match my_private_key.compute_public_key() {
-            Ok(pubkey) => pubkey,
-            Err(_) => {
-                return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
-                    types::ErrorCode::InternalError.code(), //INTERNAL_SERVER_ERROR
-                    "Failed to generate ephemeral key",
-                    None,
-                ));
-            }
-        }
-        .as_ref()
-        .to_vec();
+        let my_private_key = EphemeralSecret::random(&mut nitro_rng);
+        let my_public_key = PublicKey::from(&my_private_key).to_sec1_bytes().to_vec();
 
         let attestation = match utils::get_attestation(
             self.fd,
@@ -122,21 +103,21 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
             }
         };
 
-        let their_public_key = UnparsedPublicKey::new(&ECDH_P256, user_pubkey.as_slice());
+        let their_public_key = match PublicKey::from_sec1_bytes(&user_pubkey) {
+            Ok(pubkey) => pubkey,
+            Err(err) => {
+                return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
+                    types::ErrorCode::InvalidParams.code(), //INVALID_PARAMS
+                    format!("{:?}", err),
+                    None,
+                ));
+            }
+        };
 
-        let derived_key_result =
-            match agree_ephemeral(my_private_key, &their_public_key, |shared_secret| {
-                shared_secret.to_vec()
-            }) {
-                Ok(shared_secret) => shared_secret,
-                Err(_) => {
-                    return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
-                        types::ErrorCode::InternalError.code(), //INTERNAL_SERVER_ERROR
-                        "Failed to generate ephemeral key",
-                        None,
-                    ));
-                }
-            };
+        let derived_key_result = my_private_key
+            .diffie_hellman(&their_public_key)
+            .raw_secret_bytes()
+            .to_vec();
 
         let mut store = match self.store.lock() {
             Ok(store) => store,
@@ -153,8 +134,8 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
             Ok(_) => (),
             Err(_) => {
                 return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
-                    types::ErrorCode::InternalError.code(), //INTERNAL_SERVER_ERROR
-                    "Failed to store ephemeral key",
+                    types::ErrorCode::InvalidRequest.code(), //INTERNAL_SERVER_ERROR
+                    "UUID already exists",
                     None,
                 ));
             }
@@ -162,7 +143,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
 
         drop(store);
 
-        ResponsePayload::success(HelloResponse::new(uuid, attestation).into())
+        ResponsePayload::success(HelloResponse::new(uuid, my_public_key).into())
     }
 
     //TODO: check if circuit exists
@@ -212,7 +193,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
             }
         };
 
-        let decrypted_text = match utils::decrypt(key, cipher_text, auth_tag, nonce) {
+        let decrypted_text: String = match utils::decrypt(key, cipher_text, auth_tag, nonce) {
             Ok(text) => text,
             Err(_) => {
                 return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
@@ -328,3 +309,54 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
         return result;
     }
 }
+
+pub struct NitroRng {
+    fd: i32, // File descriptor for NitroSecureModule
+}
+
+impl NitroRng {
+    pub fn new(fd: i32) -> Self {
+        Self { fd }
+    }
+}
+
+impl RngCore for NitroRng {
+    fn fill_bytes(&mut self, dest: &mut [u8]) {
+        unsafe {
+            let mut buf_len = dest.len();
+            let res = nsm_get_random(self.fd, dest.as_mut_ptr(), &mut buf_len);
+            match res {
+                ErrorCode::Success => (),
+                _ => panic!("Failed to get random bytes: {:?}", res),
+            }
+        }
+    }
+
+    fn next_u32(&mut self) -> u32 {
+        let mut buf = [0u8; 4];
+        self.fill_bytes(&mut buf);
+        u32::from_le_bytes(buf)
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        let mut buf = [0u8; 8];
+        self.fill_bytes(&mut buf);
+        u64::from_le_bytes(buf)
+    }
+
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core::Error> {
+        unsafe {
+            let mut buf_len = dest.len();
+            let res = nsm_get_random(self.fd, dest.as_mut_ptr(), &mut buf_len);
+            match res {
+                ErrorCode::Success => Ok(()),
+                _ => Err(rand_core::Error::new(io::Error::new(
+                    io::ErrorKind::Other,
+                    "Could not generate random data",
+                ))),
+            }
+        }
+    }
+}
+
+impl CryptoRng for NitroRng {}
