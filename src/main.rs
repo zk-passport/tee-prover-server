@@ -81,6 +81,7 @@ async fn main() {
             HashMapStore::new(),
             file_generator_sender,
             Arc::clone(&circuit_zkey_map_arc),
+            pool.clone(),
         )
         .into_rpc(),
     );
