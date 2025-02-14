@@ -8,5 +8,4 @@ sudo systemctl enable --now nitro-enclaves-allocator.service && \
 sudo systemctl enable --now docker
 
 sudo nitro-cli build-enclave --docker-uri nesopie/test-tee-server --output-file prover-server.eif
-sudo nitro-cli run-enclave --cpu-count 12 --memory 49,152 --eif-path prover-server.eif --debug-mode --attach-console --enclave-cid 7
-echo "postgres://<USERNAME>:<PASSWORD>@host:5432/<DBNAME>" | socat -t 1 - VSOCK-CONNECT:7:8890
+sudo nitro-cli run-enclave --cpu-count 12 --memory 51200 --eif-path prover-server.eif --debug-mode --attach-console --enclave-cid 7
