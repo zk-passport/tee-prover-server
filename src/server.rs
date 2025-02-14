@@ -36,11 +36,7 @@ pub trait Rpc {
         auth_tag: Vec<u8>,
     ) -> ResponsePayload<'static, String>;
     #[method(name = "attestation")]
-    async fn attestation(
-        &self,
-        user_data: Option<Vec<u8>>,
-        nonce: Option<Vec<u8>>,
-    ) -> ResponsePayload<'static, Vec<u8>>;
+    async fn attestation(&self, nonce: Option<Vec<u8>>) -> ResponsePayload<'static, Vec<u8>>;
 }
 
 pub struct RpcServerImpl<S> {
@@ -302,13 +298,9 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
         ResponsePayload::success(uuid.to_string())
     }
 
-    async fn attestation(
-        &self,
-        user_data: Option<Vec<u8>>,
-        nonce: Option<Vec<u8>>,
-    ) -> ResponsePayload<'static, Vec<u8>> {
+    async fn attestation(&self, nonce: Option<Vec<u8>>) -> ResponsePayload<'static, Vec<u8>> {
         let request = Request::Attestation {
-            user_data: user_data.map(|buf| ByteBuf::from(buf)),
+            user_data: None,
             nonce: nonce.map(|buf| ByteBuf::from(buf)),
             public_key: None,
         };
