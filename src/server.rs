@@ -6,17 +6,17 @@ use jsonrpsee::types;
 use jsonrpsee::{types::ErrorObjectOwned, ResponsePayload};
 use p256::ecdh::EphemeralSecret;
 use p256::elliptic_curve::PublicKey;
-use rand_core::{CryptoRng, OsRng, RngCore};
+use rand_core::{CryptoRng, RngCore};
 use serde_bytes::ByteBuf;
+use sqlx::Pool;
 use std::collections::HashMap;
 use std::io;
-use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
 use crate::db::create_proof_status;
 use crate::store::Store;
 use crate::types::{ProofRequest, SubmitRequest};
-use crate::utils;
+use crate::utils::{self, nsm_get_random};
 use crate::{generator::file_generator::FileGenerator, types::HelloResponse};
 
 #[rpc(server, namespace = "openpassport")]
@@ -30,7 +30,7 @@ pub trait Rpc {
     #[method(name = "submit_request")]
     async fn submit_request(
         &self,
-        uuid: String,
+        uuid: uuid::Uuid,
         nonce: Vec<u8>,
         cipher_text: Vec<u8>,
         auth_tag: Vec<u8>,
@@ -40,7 +40,6 @@ pub trait Rpc {
         &self,
         user_data: Option<Vec<u8>>,
         nonce: Option<Vec<u8>>,
-        public_key: Option<Vec<u8>>,
     ) -> ResponsePayload<'static, Vec<u8>>;
 }
 
@@ -49,6 +48,7 @@ pub struct RpcServerImpl<S> {
     store: Arc<Mutex<S>>,
     file_generator_sender: tokio::sync::mpsc::Sender<FileGenerator>,
     circuit_zkey_map: Arc<HashMap<String, String>>,
+    db: Pool<sqlx::Postgres>,
 }
 
 impl<S> RpcServerImpl<S> {
@@ -57,12 +57,14 @@ impl<S> RpcServerImpl<S> {
         store: S,
         file_generator_sender: tokio::sync::mpsc::Sender<FileGenerator>,
         circuit_zkey_map: Arc<HashMap<String, String>>,
+        db: Pool<sqlx::Postgres>,
     ) -> Self {
         Self {
             fd,
             store: Arc::new(Mutex::new(store)),
             file_generator_sender,
             circuit_zkey_map,
+            db,
         }
     }
 }
@@ -149,7 +151,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
     //TODO: check if circuit exists
     async fn submit_request(
         &self,
-        uuid: String,
+        uuid: uuid::Uuid,
         nonce: Vec<u8>,
         cipher_text: Vec<u8>,
         auth_tag: Vec<u8>,
@@ -168,7 +170,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
                 }
             };
 
-            let key = match store.get_shared_secret(&uuid) {
+            let key = match store.get_shared_secret(&uuid.to_string()) {
                 Some(shared_secret) => shared_secret,
                 None => {
                     return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
@@ -268,7 +270,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
         };
 
         if let Err(e) = create_proof_status(
-            &uuid,
+            uuid,
             &(&submit_request.proof_request_type).into(),
             &submit_request.proof_request_type.circuit().name,
             submit_request.onchain,
@@ -304,12 +306,11 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
         &self,
         user_data: Option<Vec<u8>>,
         nonce: Option<Vec<u8>>,
-        public_key: Option<Vec<u8>>,
     ) -> ResponsePayload<'static, Vec<u8>> {
         let request = Request::Attestation {
             user_data: user_data.map(|buf| ByteBuf::from(buf)),
             nonce: nonce.map(|buf| ByteBuf::from(buf)),
-            public_key: public_key.map(|buf| ByteBuf::from(buf)),
+            public_key: None,
         };
 
         let result = match nsm_process_request(self.fd, request) {
