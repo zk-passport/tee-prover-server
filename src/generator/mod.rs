@@ -7,5 +7,5 @@ use serde::Deserialize;
 #[derive(Debug, Deserialize, Clone)]
 pub struct Circuit {
     pub name: String,
-    inputs: String, //json
+    pub inputs: String, //json
 }

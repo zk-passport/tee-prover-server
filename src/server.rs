@@ -13,9 +13,10 @@ use std::io;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
+use crate::db::create_proof_status;
 use crate::store::Store;
-use crate::types::ProofRequest;
-use crate::utils::{self, nsm_get_random};
+use crate::types::{ProofRequest, SubmitRequest};
+use crate::utils;
 use crate::{generator::file_generator::FileGenerator, types::HelloResponse};
 
 #[rpc(server, namespace = "openpassport")]
@@ -33,7 +34,6 @@ pub trait Rpc {
         nonce: Vec<u8>,
         cipher_text: Vec<u8>,
         auth_tag: Vec<u8>,
-        onchain: bool,
     ) -> ResponsePayload<'static, String>;
     #[method(name = "attestation")]
     async fn attestation(
@@ -47,7 +47,7 @@ pub trait Rpc {
 pub struct RpcServerImpl<S> {
     fd: i32,
     store: Arc<Mutex<S>>,
-    file_generator_sender: tokio::sync::mpsc::Sender<(bool, FileGenerator)>,
+    file_generator_sender: tokio::sync::mpsc::Sender<FileGenerator>,
     circuit_zkey_map: Arc<HashMap<String, String>>,
 }
 
@@ -55,7 +55,7 @@ impl<S> RpcServerImpl<S> {
     pub fn new(
         fd: i32,
         store: S,
-        file_generator_sender: tokio::sync::mpsc::Sender<(bool, FileGenerator)>,
+        file_generator_sender: tokio::sync::mpsc::Sender<FileGenerator>,
         circuit_zkey_map: Arc<HashMap<String, String>>,
     ) -> Self {
         Self {
@@ -153,7 +153,6 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
         nonce: Vec<u8>,
         cipher_text: Vec<u8>,
         auth_tag: Vec<u8>,
-        onchain: bool,
     ) -> ResponsePayload<'static, String> {
         let nonce = nonce.as_slice();
         let auth_tag = auth_tag.as_slice();
@@ -204,9 +203,43 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
             }
         };
 
-        let proof_request_type = match serde_json::from_str::<ProofRequest>(&decrypted_text) {
-            Ok(proof_request_type) => {
-                let circuit_name = proof_request_type.circuit().name.clone();
+        let submit_request = match serde_json::from_str::<SubmitRequest>(&decrypted_text) {
+            Ok(submit_request) => {
+                let mut allowed_proof_type = "";
+                if cfg!(feature = "register") {
+                    allowed_proof_type = "register";
+                } else if cfg!(feature = "dsc") {
+                    allowed_proof_type = "dsc";
+                } else {
+                    allowed_proof_type = "disclose";
+                }
+
+                let invalid_proof_type_response =
+                    ResponsePayload::error(ErrorObjectOwned::owned::<String>(
+                        types::ErrorCode::InvalidRequest.code(), //BAD REQUEST
+                        format!("This endpoint only allows {} inputs", allowed_proof_type),
+                        None,
+                    ));
+
+                match submit_request.proof_request_type {
+                    ProofRequest::Register { .. } => {
+                        if !cfg!(feature = "register") {
+                            return invalid_proof_type_response;
+                        }
+                    }
+                    ProofRequest::Dsc { .. } => {
+                        if !cfg!(feature = "dsc") {
+                            return invalid_proof_type_response;
+                        }
+                    }
+                    ProofRequest::Disclose { .. } => {
+                        if !cfg!(feature = "disclose") {
+                            return invalid_proof_type_response;
+                        }
+                    }
+                };
+
+                let circuit_name = submit_request.proof_request_type.circuit().name.clone();
                 if !self.circuit_zkey_map.contains_key(&circuit_name) {
                     return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
                         types::ErrorCode::InvalidRequest.code(),
@@ -214,7 +247,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
                         None,
                     ));
                 }
-                proof_request_type
+                submit_request
             }
             Err(_) => {
                 return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
@@ -225,57 +258,35 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
             }
         };
 
-        let mut allowed_proof_type = "";
-        if cfg!(feature = "register") {
-            allowed_proof_type = "register";
-        } else if cfg!(feature = "dsc") {
-            allowed_proof_type = "dsc";
-        } else {
-            allowed_proof_type = "disclose";
-        }
+        let (endpoint_type, endpoint) = match &submit_request.proof_request_type {
+            ProofRequest::Disclose {
+                endpoint_type,
+                endpoint,
+                ..
+            } => (Some(endpoint_type), Some(endpoint)),
+            _ => (None, None),
+        };
 
-        let invalid_proof_type_response =
-            ResponsePayload::error(ErrorObjectOwned::owned::<String>(
-                types::ErrorCode::InvalidRequest.code(), //BAD REQUEST
-                format!("This endpoint only allows {} inputs", allowed_proof_type),
+        if let Err(e) = create_proof_status(
+            &uuid,
+            &(&submit_request.proof_request_type).into(),
+            &submit_request.proof_request_type.circuit().name,
+            submit_request.onchain,
+            &self.db,
+            endpoint_type,
+            endpoint,
+        )
+        .await
+        {
+            return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
+                types::ErrorCode::InternalError.code(), //INTERNAL_SERVER_ERROR
+                e,
                 None,
             ));
+        }
 
-        match proof_request_type {
-            ProofRequest::Register { .. } => {
-                if !cfg!(feature = "register") {
-                    return invalid_proof_type_response;
-                }
-            }
-            ProofRequest::Dsc { .. } => {
-                if !cfg!(feature = "dsc") {
-                    return invalid_proof_type_response;
-                }
-            }
-            ProofRequest::Disclose { .. } => {
-                if !cfg!(feature = "disclose") {
-                    return invalid_proof_type_response;
-                }
-            }
-        };
-
-        let uuid = match uuid::Uuid::from_str(&uuid) {
-            Ok(uuid) => uuid,
-            Err(_) => {
-                return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
-                    types::ErrorCode::InvalidRequest.code(),
-                    "Failed to parse uuid",
-                    None,
-                ));
-            }
-        };
-
-        let file_generator = FileGenerator::new(uuid, proof_request_type);
-        match self
-            .file_generator_sender
-            .send((onchain, file_generator))
-            .await
-        {
+        let file_generator = FileGenerator::new(uuid.clone(), submit_request.proof_request_type);
+        match self.file_generator_sender.send(file_generator).await {
             Ok(()) => (),
             Err(e) => {
                 return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
