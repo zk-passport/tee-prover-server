@@ -1,0 +1,19 @@
+{
+  "name": "relayer",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@typechain/ethers-v6": "^0.5.1",
+    "ethers": "^6.13.5"
+  },
+  "devDependencies": {
+    "typechain": "^8.3.2"
+  }
+}

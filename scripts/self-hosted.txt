@@ -1,0 +1,13 @@
+sudo dnf install aws-nitro-enclaves-cli -y && \
+sudo dnf install aws-nitro-enclaves-cli-devel -y && \
+sudo usermod -aG ne ec2-user && \
+sudo usermod -aG docker ec2-user && \
+nitro-cli --version && \
+sudo sed -i "s/^memory_mib:.*/memory_mib: 51200/; s/^cpu_count:.*/cpu_count: 12/" /etc/nitro_enclaves/allocator.yaml && \
+sudo systemctl enable --now nitro-enclaves-allocator.service && \
+sudo systemctl enable --now docker
+
+sudo yum install git libicu -y
+curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.rpm.sh | sudo bash
+sudo yum install git-lfs -y
+git lfs install
