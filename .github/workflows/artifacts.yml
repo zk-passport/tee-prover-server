@@ -61,13 +61,8 @@ jobs:
         run: |
           sudo docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build and push Docker enclave images
+      - name: Build Docker image
         run: |
-<<<<<<< HEAD
-          sudo docker build --push --build-arg PROOFTYPE=register -f Dockerfile.tee.actions --target=nitro-enclave -t nesopie/tee-server-register:latest .
-          sudo docker build --push --build-arg PROOFTYPE=disclose -f Dockerfile.tee.actions --target=nitro-enclave -t nesopie/tee-server-disclose:latest .
-          sudo docker build --push --build-arg PROOFTYPE=dsc      -f Dockerfile.tee.actions --target=nitro-enclave -t nesopie/tee-server-dsc:latest .
-=======
           sudo docker build --build-arg PROOFTYPE=register -f Dockerfile.tee -t nesopie/tee-server-register:latest .
           sudo docker build --build-arg PROOFTYPE=disclose -f Dockerfile.tee -t nesopie/tee-server-disclose:latest .
           sudo docker build --build-arg PROOFTYPE=dsc      -f Dockerfile.tee -t nesopie/tee-server-dsc:latest .
@@ -77,7 +72,6 @@ jobs:
           sudo docker push nesopie/tee-server-register:latest
           sudo docker push nesopie/tee-server-disclose:latest
           sudo docker push nesopie/tee-server-dsc:latest
->>>>>>> ad7275ac28a48484e6ba2dd042a8ade9b16ba69c
 
       # build the eif
       - name: Build eifs
@@ -89,12 +83,6 @@ jobs:
           sudo nitro-cli build-enclave --docker-uri ${{ secrets.DOCKER_USERNAME }}/tee-server-register --output-file prover-server-register.eif > measurements/register.log 2>&1
           sudo nitro-cli build-enclave --docker-uri ${{ secrets.DOCKER_USERNAME }}/tee-server-disclose --output-file prover-server-disclose.eif > measurements/disclose.log 2>&1
           sudo nitro-cli build-enclave --docker-uri ${{ secrets.DOCKER_USERNAME }}/tee-server-dsc --output-file prover-server-dsc.eif > measurements/dsc.log 2>&1
-
-      - name: Build and push Docker instance images
-        run: |
-          sudo docker build --push --build-arg PROOFTYPE=register -f Dockerfile.tee.actions --target=instance -t nesopie/tee-server-register-instance:latest .
-          sudo docker build --push --build-arg PROOFTYPE=disclose -f Dockerfile.tee.actions --target=instance -t nesopie/tee-server-disclose-instance:latest .
-          sudo docker build --push --build-arg PROOFTYPE=dsc      -f Dockerfile.tee.actions --target=instance -t nesopie/tee-server-dsc-instance:latest .
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
