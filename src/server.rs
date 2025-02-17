@@ -1,5 +1,4 @@
-use aws_nitro_enclaves_nsm_api::api::{ErrorCode, Request, Response};
-use aws_nitro_enclaves_nsm_api::driver::nsm_process_request;
+use aws_nitro_enclaves_nsm_api::api::ErrorCode;
 use jsonrpsee::core::async_trait;
 use jsonrpsee::proc_macros::rpc;
 use jsonrpsee::types;
@@ -7,7 +6,6 @@ use jsonrpsee::{types::ErrorObjectOwned, ResponsePayload};
 use p256::ecdh::EphemeralSecret;
 use p256::elliptic_curve::PublicKey;
 use rand_core::{CryptoRng, RngCore};
-use serde_bytes::ByteBuf;
 use sqlx::Pool;
 use std::collections::HashMap;
 use std::io;
@@ -35,8 +33,6 @@ pub trait Rpc {
         cipher_text: Vec<u8>,
         auth_tag: Vec<u8>,
     ) -> ResponsePayload<'static, String>;
-    #[method(name = "attestation")]
-    async fn attestation(&self, nonce: Option<Vec<u8>>) -> ResponsePayload<'static, Vec<u8>>;
 }
 
 pub struct RpcServerImpl<S> {
@@ -296,32 +292,6 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
         }
 
         ResponsePayload::success(uuid.to_string())
-    }
-
-    async fn attestation(&self, nonce: Option<Vec<u8>>) -> ResponsePayload<'static, Vec<u8>> {
-        let request = Request::Attestation {
-            user_data: None,
-            nonce: nonce.map(|buf| ByteBuf::from(buf)),
-            public_key: None,
-        };
-
-        let result = match nsm_process_request(self.fd, request) {
-            Response::Attestation { document } => ResponsePayload::success(document),
-            Response::Error(err) => ResponsePayload::error(ErrorObjectOwned::owned::<String>(
-                types::ErrorCode::InternalError.code(), //INTERNAL_SERVER_ERROR
-                format!("{:?}", err),
-                None,
-            )),
-            _ => {
-                return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
-                    types::ErrorCode::InternalError.code(), //INTERNAL_SERVER_ERROR
-                    format!("{:?}", ErrorCode::InvalidResponse),
-                    None,
-                ));
-            }
-        };
-
-        return result;
     }
 }
 
