@@ -1,5 +1,3 @@
-use std::io;
-
 use crate::db::fail_proof;
 use aes_gcm::aead::Aead;
 use aes_gcm::{Aes256Gcm, Key, KeyInit, Nonce};
@@ -55,8 +53,23 @@ pub fn get_attestation(
     }
 }
 
-pub async fn cleanup(uuid: &String, pool: &sqlx::Pool<sqlx::Postgres>, reason: String) {
-    let _ = fail_proof(&uuid, &pool, reason).await;
-    let tmp_folder = get_tmp_folder_path(&uuid);
+pub async fn cleanup(uuid: uuid::Uuid, pool: &sqlx::Pool<sqlx::Postgres>, reason: String) {
+    let tmp_folder = get_tmp_folder_path(&uuid.to_string());
+    let _ = fail_proof(uuid, &pool, reason).await;
     let _ = tokio::fs::remove_dir_all(tmp_folder).await;
+}
+
+pub unsafe fn nsm_get_random(fd: i32, buf: *mut u8, buf_len: &mut usize) -> ErrorCode {
+    if fd < 0 || buf.is_null() || buf_len == &0 {
+        return ErrorCode::InvalidArgument;
+    }
+    match nsm_process_request(fd, Request::GetRandom) {
+        Response::GetRandom { random } => {
+            *buf_len = std::cmp::min(*buf_len, random.len());
+            std::ptr::copy_nonoverlapping(random.as_ptr(), buf, *buf_len);
+            ErrorCode::Success
+        }
+        Response::Error(err) => err,
+        _ => ErrorCode::InvalidResponse,
+    }
 }

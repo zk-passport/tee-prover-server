@@ -6,19 +6,19 @@ use crate::types::{ProofRequest, ProofType};
 use tokio::io::AsyncWriteExt;
 
 pub struct FileGenerator {
-    uuid: String,
+    uuid: uuid::Uuid,
     pub proof_request: ProofRequest,
 }
 
 impl FileGenerator {
-    pub fn new(uuid: String, proof_request: ProofRequest) -> Self {
+    pub fn new(uuid: uuid::Uuid, proof_request: ProofRequest) -> Self {
         Self {
             uuid,
             proof_request,
         }
     }
 
-    pub fn uuid(&self) -> String {
+    pub fn uuid(&self) -> uuid::Uuid {
         self.uuid.clone()
     }
 
@@ -28,8 +28,8 @@ impl FileGenerator {
 
     //create the tmp folder
     //create the inputs file
-    pub async fn run(&self) -> Result<(String, String), std::io::Error> {
-        let path_str = get_tmp_folder_path(&self.uuid);
+    pub async fn run(&self) -> Result<(uuid::Uuid, String), std::io::Error> {
+        let path_str = get_tmp_folder_path(&self.uuid.to_string());
         let path = path::Path::new(&path_str);
         tokio::fs::create_dir_all(path).await?;
 
