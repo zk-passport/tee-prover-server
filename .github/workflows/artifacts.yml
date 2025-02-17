@@ -63,21 +63,9 @@ jobs:
 
       - name: Build and push Docker enclave images
         run: |
-<<<<<<< HEAD
           sudo docker build --push --build-arg PROOFTYPE=register -f Dockerfile.tee.actions --target=nitro-enclave -t nesopie/tee-server-register:latest .
           sudo docker build --push --build-arg PROOFTYPE=disclose -f Dockerfile.tee.actions --target=nitro-enclave -t nesopie/tee-server-disclose:latest .
           sudo docker build --push --build-arg PROOFTYPE=dsc      -f Dockerfile.tee.actions --target=nitro-enclave -t nesopie/tee-server-dsc:latest .
-=======
-          sudo docker build --build-arg PROOFTYPE=register -f Dockerfile.tee -t nesopie/tee-server-register:latest .
-          sudo docker build --build-arg PROOFTYPE=disclose -f Dockerfile.tee -t nesopie/tee-server-disclose:latest .
-          sudo docker build --build-arg PROOFTYPE=dsc      -f Dockerfile.tee -t nesopie/tee-server-dsc:latest .
-
-      - name: Push docker images
-        run: |
-          sudo docker push nesopie/tee-server-register:latest
-          sudo docker push nesopie/tee-server-disclose:latest
-          sudo docker push nesopie/tee-server-dsc:latest
->>>>>>> ad7275ac28a48484e6ba2dd042a8ade9b16ba69c
 
       # build the eif
       - name: Build eifs
