@@ -63,9 +63,9 @@ jobs:
 
       - name: Build and push Docker enclave images
         run: |
-          sudo docker build --push --build-arg PROOFTYPE=register -f Dockerfile.tee.actions --target=nitro-enclave -t nesopie/tee-server-register:latest .
-          sudo docker build --push --build-arg PROOFTYPE=disclose -f Dockerfile.tee.actions --target=nitro-enclave -t nesopie/tee-server-disclose:latest .
-          sudo docker build --push --build-arg PROOFTYPE=dsc      -f Dockerfile.tee.actions --target=nitro-enclave -t nesopie/tee-server-dsc:latest .
+          sudo docker build --push --build-arg PROOFTYPE=register -f Dockerfile.tee --target=nitro-enclave -t nesopie/tee-server-register:latest .
+          sudo docker build --push --build-arg PROOFTYPE=disclose -f Dockerfile.tee --target=nitro-enclave -t nesopie/tee-server-disclose:latest .
+          sudo docker build --push --build-arg PROOFTYPE=dsc      -f Dockerfile.tee --target=nitro-enclave -t nesopie/tee-server-dsc:latest .
 
       # build the eif
       - name: Build eifs
@@ -80,9 +80,9 @@ jobs:
 
       - name: Build and push Docker instance images
         run: |
-          sudo docker build --push --build-arg PROOFTYPE=register -f Dockerfile.tee.actions --target=instance -t nesopie/tee-server-register-instance:latest .
-          sudo docker build --push --build-arg PROOFTYPE=disclose -f Dockerfile.tee.actions --target=instance -t nesopie/tee-server-disclose-instance:latest .
-          sudo docker build --push --build-arg PROOFTYPE=dsc      -f Dockerfile.tee.actions --target=instance -t nesopie/tee-server-dsc-instance:latest .
+          sudo docker build --push --build-arg PROOFTYPE=register -f Dockerfile.tee --target=instance -t nesopie/tee-server-register-instance:latest .
+          sudo docker build --push --build-arg PROOFTYPE=disclose -f Dockerfile.tee --target=instance -t nesopie/tee-server-disclose-instance:latest .
+          sudo docker build --push --build-arg PROOFTYPE=dsc      -f Dockerfile.tee --target=instance -t nesopie/tee-server-dsc-instance:latest .
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
