@@ -9,10 +9,10 @@ use rand_core::{CryptoRng, RngCore};
 use sqlx::Pool;
 use std::collections::HashMap;
 use std::io;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use crate::db::create_proof_status;
-use crate::store::Store;
+use crate::store::LruStore;
 use crate::types::{ProofRequest, SubmitRequest};
 use crate::utils::{self, nsm_get_random};
 use crate::{generator::file_generator::FileGenerator, types::HelloResponse};
@@ -35,25 +35,25 @@ pub trait Rpc {
     ) -> ResponsePayload<'static, String>;
 }
 
-pub struct RpcServerImpl<S> {
+pub struct RpcServerImpl {
     fd: i32,
-    store: Arc<Mutex<S>>,
+    store: LruStore,
     file_generator_sender: tokio::sync::mpsc::Sender<FileGenerator>,
     circuit_zkey_map: Arc<HashMap<String, String>>,
     db: Pool<sqlx::Postgres>,
 }
 
-impl<S> RpcServerImpl<S> {
+impl RpcServerImpl {
     pub fn new(
         fd: i32,
-        store: S,
+        store: LruStore,
         file_generator_sender: tokio::sync::mpsc::Sender<FileGenerator>,
         circuit_zkey_map: Arc<HashMap<String, String>>,
         db: Pool<sqlx::Postgres>,
     ) -> Self {
         Self {
             fd,
-            store: Arc::new(Mutex::new(store)),
+            store,
             file_generator_sender,
             circuit_zkey_map,
             db,
@@ -62,7 +62,7 @@ impl<S> RpcServerImpl<S> {
 }
 
 #[async_trait]
-impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
+impl RpcServer for RpcServerImpl {
     async fn hello(
         &self,
         user_pubkey: Vec<u8>,
@@ -113,18 +113,11 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
             .raw_secret_bytes()
             .to_vec();
 
-        let mut store = match self.store.lock() {
-            Ok(store) => store,
-            Err(_) => {
-                return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
-                    types::ErrorCode::InternalError.code(), // INTERNAL_SERVER_ERROR
-                    "Failed to store ephemeral key",
-                    None,
-                ));
-            }
-        };
-
-        match store.insert_new_agreement(uuid, derived_key_result) {
+        match self
+            .store
+            .insert_new_agreement(uuid, derived_key_result)
+            .await
+        {
             Ok(_) => (),
             Err(_) => {
                 return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
@@ -134,8 +127,6 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
                 ));
             }
         }
-
-        drop(store);
 
         ResponsePayload::success(HelloResponse::new(uuid, attestation).into())
     }
@@ -151,20 +142,10 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
         let nonce = nonce.as_slice();
         let auth_tag = auth_tag.as_slice();
         let key = {
-            let store = match self.store.lock() {
-                Ok(store) => store,
-                Err(_) => {
-                    return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
-                        types::ErrorCode::InternalError.code(), //INTERNAL_SERVER_ERROR
-                        "Failed to store ephemeral key",
-                        None,
-                    ));
-                }
-            };
-
-            let key = match store.get_shared_secret(&uuid.to_string()) {
+            let key = match self.store.get_shared_secret(&uuid).await {
                 Some(shared_secret) => shared_secret,
                 None => {
+                    self.store.remove_agreement(&uuid).await;
                     return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
                         types::ErrorCode::InvalidRequest.code(),
                         "UUID not found",
@@ -178,6 +159,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
         let key: [u8; 32] = match key.try_into() {
             Ok(key) => key,
             Err(_) => {
+                self.store.remove_agreement(&uuid).await;
                 return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
                     types::ErrorCode::InternalError.code(), //INTERNAL_SERVER_ERROR
                     "Failed to store ephemeral key",
@@ -189,6 +171,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
         let decrypted_text: String = match utils::decrypt(key, cipher_text, auth_tag, nonce) {
             Ok(text) => text,
             Err(_) => {
+                self.store.remove_agreement(&uuid).await;
                 return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
                     types::ErrorCode::InvalidRequest.code(),
                     "Failed to decrypt text",
@@ -218,16 +201,19 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
                 match submit_request.proof_request_type {
                     ProofRequest::Register { .. } => {
                         if !cfg!(feature = "register") {
+                            self.store.remove_agreement(&uuid).await;
                             return invalid_proof_type_response;
                         }
                     }
                     ProofRequest::Dsc { .. } => {
                         if !cfg!(feature = "dsc") {
+                            self.store.remove_agreement(&uuid).await;
                             return invalid_proof_type_response;
                         }
                     }
                     ProofRequest::Disclose { .. } => {
                         if !cfg!(feature = "disclose") {
+                            self.store.remove_agreement(&uuid).await;
                             return invalid_proof_type_response;
                         }
                     }
@@ -235,6 +221,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
 
                 let circuit_name = submit_request.proof_request_type.circuit().name.clone();
                 if !self.circuit_zkey_map.contains_key(&circuit_name) {
+                    self.store.remove_agreement(&uuid).await;
                     return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
                         types::ErrorCode::InvalidRequest.code(),
                         format!("Could not find the given circuit name: {}", &circuit_name),
@@ -244,6 +231,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
                 submit_request
             }
             Err(_) => {
+                self.store.remove_agreement(&uuid).await;
                 return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
                     types::ErrorCode::InvalidRequest.code(),
                     "Failed to parse proof request",
@@ -272,6 +260,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
         )
         .await
         {
+            self.store.remove_agreement(&uuid).await;
             return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
                 types::ErrorCode::InternalError.code(), //INTERNAL_SERVER_ERROR
                 e,
@@ -283,6 +272,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
         match self.file_generator_sender.send(file_generator).await {
             Ok(()) => (),
             Err(e) => {
+                self.store.remove_agreement(&uuid).await;
                 return ResponsePayload::error(ErrorObjectOwned::owned::<String>(
                     types::ErrorCode::InternalError.code(), //INTERNAL_SERVER_ERROR
                     e.to_string(),
@@ -291,6 +281,7 @@ impl<S: Store + Sync + Send + 'static> RpcServer for RpcServerImpl<S> {
             }
         }
 
+        self.store.remove_agreement(&uuid).await;
         ResponsePayload::success(uuid.to_string())
     }
 }
