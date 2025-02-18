@@ -17,7 +17,6 @@ use generator::{proof_generator::ProofGenerator, witness_generator::WitnessGener
 use jsonrpsee::server::Server;
 use server::RpcServer;
 use sqlx::postgres::PgPoolOptions;
-use store::HashMapStore;
 use utils::{cleanup, get_tmp_folder_path};
 
 #[tokio::main]
@@ -78,7 +77,7 @@ async fn main() {
     let handle = server.start(
         server::RpcServerImpl::new(
             fd,
-            HashMapStore::new(),
+            store::LruStore::new(1000),
             file_generator_sender,
             Arc::clone(&circuit_zkey_map_arc),
             pool.clone(),

@@ -1,43 +1,45 @@
-use std::collections::HashMap;
+use std::num::NonZeroUsize;
 
-pub trait Store {
-    fn insert_new_agreement(
-        &mut self,
-        uuid: uuid::Uuid,
-        shared_secret: Vec<u8>,
-    ) -> Result<(), String>;
+// use std::collections::HashMap;
+use lru::LruCache;
+use tokio::sync::Mutex;
 
-    fn get_shared_secret(&self, uuid: &String) -> Option<Vec<u8>>;
+pub struct LruStore {
+    ecdh_store: Mutex<LruCache<String, Vec<u8>>>,
 }
 
-pub struct HashMapStore {
-    ecdh_store: HashMap<String, Vec<u8>>,
-}
-
-impl HashMapStore {
-    pub fn new() -> Self {
-        HashMapStore {
-            ecdh_store: HashMap::new(),
+impl LruStore {
+    pub fn new(size: usize) -> Self {
+        Self {
+            ecdh_store: Mutex::new(LruCache::new(NonZeroUsize::new(size).unwrap())),
         }
     }
 }
 
-impl Store for HashMapStore {
-    fn insert_new_agreement(
-        &mut self,
+impl LruStore {
+    pub async fn insert_new_agreement(
+        &self,
         uuid: uuid::Uuid,
         shared_secret: Vec<u8>,
     ) -> Result<(), String> {
-        if self.ecdh_store.contains_key(&uuid.to_string()) {
+        let mut cache = self.ecdh_store.lock().await;
+
+        if cache.contains(&uuid.to_string()) {
             return Err("Duplicate uuid".to_string());
         } else {
-            self.ecdh_store.insert(uuid.to_string(), shared_secret);
+            cache.put(uuid.to_string(), shared_secret);
         }
 
         return Ok(());
     }
 
-    fn get_shared_secret(&self, uuid: &String) -> Option<Vec<u8>> {
-        self.ecdh_store.get(uuid).cloned()
+    pub async fn get_shared_secret(&self, uuid: &uuid::Uuid) -> Option<Vec<u8>> {
+        let mut cache = self.ecdh_store.lock().await;
+        cache.get(&uuid.to_string()).map(|x| x.clone())
+    }
+
+    pub async fn remove_agreement(&self, uuid: &uuid::Uuid) {
+        let mut cache = self.ecdh_store.lock().await;
+        cache.pop(&uuid.to_string());
     }
 }
