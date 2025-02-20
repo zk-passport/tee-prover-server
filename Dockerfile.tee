@@ -89,9 +89,9 @@ RUN \
 
 ######## kms image ########
 
-# FROM amazonlinux:2 AS instance
+FROM amazonlinux:2 AS instance
 
-# COPY --from=instance_full_image / /
+COPY --from=instance_full_image / /
 
 COPY instance-deps/socat /usr/bin/socat
 COPY instance-deps/vsock-proxy /usr/bin/vsock-proxy
