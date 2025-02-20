@@ -24,4 +24,8 @@ pub struct Config {
     /// Rapidsnark path
     #[arg(short = 'r', long, default_value = "./rapidsnark")]
     pub rapidsnark_path: String,
+
+    /// Private key
+    #[arg(long)]
+    pub private_key: String,
 }

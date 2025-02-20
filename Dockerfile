@@ -1,20 +1,17 @@
-FROM public.ecr.aws/docker/library/rust:1.81-bookworm as rust-builder
+######## Enclave image ########
+
+FROM public.ecr.aws/docker/library/rust:1.81-bookworm AS rust-builder
+WORKDIR /src/
+COPY Cargo.toml Cargo.lock ./
+COPY src src/
+
+ARG PROOFTYPE=${PROOFTYPE}
+RUN cargo build --locked --release --features $PROOFTYPE
+
+FROM public.ecr.aws/docker/library/debian:12.6-slim@sha256:2ccc7e39b0a6f504d252f807da1fc4b5bcd838e83e4dec3e2f57b2a4a64e7214 AS nitro-enclave
 
 RUN apt-get update
-RUN apt-get install build-essential cmake libgmp-dev libsodium-dev nasm curl m4 -y
-
-RUN git clone https://github.com/iden3/circom.git
-RUN cd circom
-RUN cd circom && cargo build --release
-RUN cd circom && cargo install --path circom
-
-WORKDIR /self
-COPY ./self .
-
-WORKDIR /circuits
-COPY ./witnesscalc .
-RUN ./build_gmp.sh host
-RUN ./build_witnesses.sh /circuits
+RUN apt-get install build-essential cmake libgmp-dev libsodium-dev nasm curl m4 netcat-traditional socat iproute2 git jq unzip libc6 -y
 
 WORKDIR /rapidsnark
 COPY ./rapidsnark .
@@ -23,21 +20,15 @@ RUN ./build_gmp.sh host && \
     cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=../package && \
     make -j16 && make install
 
-WORKDIR /
-RUN USER=root cargo new --bin tee-server
-WORKDIR /tee-server
-
-COPY ./Cargo.lock ./Cargo.lock
-COPY ./Cargo.toml ./Cargo.toml
-
+COPY start.sh /usr/local/bin
+RUN chown root:root /usr/local/bin/start.sh
+RUN chmod 755 /usr/local/bin/start.sh
 ARG PROOFTYPE=${PROOFTYPE}
-RUN cargo build --release --features $PROOFTYPE
-RUN rm src/*.rs
 
-COPY ./src ./src
+COPY --from=rust-builder /src/target/release/tee-server /usr/local/bin/
+WORKDIR /
+COPY circuits /circuits
 
-RUN cargo install --path .
+COPY ./zkeys/$PROOFTYPE /zkeys
 
-COPY ./zkeys ./zkeys 
-
-ENTRYPOINT ["tee-server"]
+CMD ["/usr/local/bin/start.sh"]

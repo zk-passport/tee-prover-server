@@ -8,6 +8,7 @@ socat tcp-listen:8889,fork vsock-connect:3:8889,reuseaddr & # for the db
 
 # assume that I get the db url string from the parent instance
 DB_PARAMS=$(socat -u vsock-listen:8890,reuseaddr - | head -n 1)
+PRIVATE_KEY=$(socat -u vsock-listen:8890,reuseaddr - | head -n 1)
 
 DB_USER=$(echo "$DB_PARAMS" | sed -E 's#^postgres://([^:]+):.*#\1#')
 DB_PASS=$(echo "$DB_PARAMS" | sed -E 's#^postgres://[^:]+:([^@]+)@.*#\1#')
@@ -22,4 +23,5 @@ echo $DATABASE_URL
     --database-url=$DATABASE_URL \
     --circuit-folder=/circuits \
     --zkey-folder=/zkeys \
-    --rapidsnark-path=/rapidsnark
+    --rapidsnark-path=/rapidsnark \
+    --private-key=$PRIVATE_KEY

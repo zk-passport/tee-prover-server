@@ -1,3 +1,9 @@
+use alloy_primitives::keccak256;
+use alloy_signer::{Signature, SignerSync};
+use alloy_signer_local::PrivateKeySigner;
+use num_bigint::BigUint;
+use num_traits::Num;
+
 use serde::{Deserialize, Serialize};
 use sqlx::types::chrono::Utc;
 
@@ -67,7 +73,11 @@ pub async fn set_witness_generated(
     }
 }
 
-pub async fn update_proof(uuid: uuid::Uuid, db: &sqlx::Pool<sqlx::Postgres>) -> Result<(), String> {
+pub async fn update_proof(
+    uuid: uuid::Uuid,
+    db: &sqlx::Pool<sqlx::Postgres>,
+    signer: &PrivateKeySigner,
+) -> Result<(), String> {
     let proof_file_path =
         std::path::Path::new(&get_tmp_folder_path(&uuid.to_string())).join("proof.json");
     let public_inputs_file_path =
@@ -105,6 +115,23 @@ pub async fn update_proof(uuid: uuid::Uuid, db: &sqlx::Pool<sqlx::Postgres>) -> 
         }
     };
 
+    let proof_msg = proof.to_bytes();
+    let message_hash = keccak256(&&proof_msg);
+    let alloy_signature: Signature = signer.sign_hash_sync(&message_hash).unwrap();
+
+    let parity = if alloy_signature.recid().is_y_odd() {
+        1
+    } else {
+        0
+    } + 27;
+    let r: [u8; 32] = alloy_signature.r().to_be_bytes();
+    let s: [u8; 32] = alloy_signature.s().to_be_bytes();
+
+    let mut signature = Vec::with_capacity(65);
+    signature.extend_from_slice(&r);
+    signature.extend_from_slice(&s);
+    signature.push(parity as u8);
+
     let mut public_inputs_reader = serde_json::de::Deserializer::from_str(&public_inputs_string);
 
     let public_inputs = match PublicInputs::deserialize(&mut public_inputs_reader) {
@@ -118,12 +145,13 @@ pub async fn update_proof(uuid: uuid::Uuid, db: &sqlx::Pool<sqlx::Postgres>) -> 
 
     let now = Utc::now();
     match sqlx::query(
-        "UPDATE proofs SET proof = $1, status = $2, proof_generated_at = $3, public_inputs = $4  WHERE request_id = $5",
+        "UPDATE proofs SET proof = $1, status = $2, proof_generated_at = $3, public_inputs = $4, signature=$5 WHERE request_id = $6",
     )
     .bind(sqlx::types::Json(proof))
     .bind(status)
     .bind(now)
     .bind(public_inputs)
+    .bind(signature)
     .bind(sqlx::types::uuid::Uuid::from(uuid))
     .execute(db)
     .await
@@ -157,9 +185,60 @@ pub async fn fail_proof(
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct Proof {
-    pi_a: Vec<String>,
-    pi_b: Vec<Vec<String>>,
-    pi_c: Vec<String>,
-    protocol: String,
+pub struct Proof {
+    pub pi_a: Vec<String>,
+    pub pi_b: Vec<Vec<String>>,
+    pub pi_c: Vec<String>,
+    pub protocol: String,
+}
+
+impl Proof {
+    fn to_bytes32(value: &String) -> Option<[u8; 32]> {
+        let num = BigUint::from_str_radix(value, 10).ok()?;
+        let bytes = num.to_bytes_be();
+
+        if bytes.len() > 32 {
+            return None;
+        }
+
+        let mut bytes32 = [0u8; 32];
+        bytes32[(32 - bytes.len())..].copy_from_slice(&bytes);
+
+        Some(bytes32)
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut final_bytes: Vec<u8> = vec![];
+
+        for i in 0..self.pi_a.len() - 1 {
+            let bytes32 = match Self::to_bytes32(&self.pi_a[i]) {
+                Some(bytes32) => bytes32.to_vec(),
+                None => return final_bytes, //this branch should never be triggered
+            };
+
+            final_bytes.extend(bytes32);
+        }
+
+        for i in 0..self.pi_b.len() - 1 {
+            for j in 0..self.pi_b[i].len() {
+                let bytes32 = match Self::to_bytes32(&self.pi_b[i][j]) {
+                    Some(bytes32) => bytes32.to_vec(),
+                    None => return final_bytes, //this branch should never be triggered
+                };
+
+                final_bytes.extend(bytes32)
+            }
+        }
+
+        for i in 0..self.pi_c.len() - 1 {
+            let bytes32 = match Self::to_bytes32(&self.pi_c[i]) {
+                Some(bytes32) => bytes32.to_vec(),
+                None => return final_bytes, //this branch should never be triggered
+            };
+
+            final_bytes.extend(bytes32);
+        }
+
+        return final_bytes;
+    }
 }

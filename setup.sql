@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS proofs (
     endpoint_type VARCHAR(128),
     endpoint VARCHAR(128),
     public_inputs TEXT[],
+    signature TEXT[], 
     reason TEXT, 
     identifier VARCHAR(255)
 );
@@ -33,6 +34,7 @@ BEGIN
       'endpoint_type', NEW.endpoint_type,
       'endpoint', NEW.endpoint,
       'public_inputs', NEW.public_inputs,
+      'signature', NEW.signature,
       'reason', NEW.reason,
       'identifier', NEW.identifier
     );

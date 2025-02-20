@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use std::path;
 use std::sync::Arc;
 
+use alloy_signer_local::PrivateKeySigner;
 use aws_nitro_enclaves_nsm_api::driver::{nsm_exit, nsm_init};
 use clap::Parser;
 use db::{set_witness_generated, update_proof};
@@ -33,7 +34,11 @@ async fn main() {
     let server_addr = server.local_addr().unwrap();
     let fd = nsm_init();
 
-    // handle.stopped().await
+    let private_key = config.private_key;
+
+    let pk = hex::decode(private_key).unwrap();
+
+    let signer = PrivateKeySigner::from_slice(&pk).unwrap();
 
     println!("Server running on: http://{}", server_addr);
 
@@ -181,7 +186,7 @@ async fn main() {
                 cleanup(uuid.clone(), &pool, e.to_string()).await;
                 continue;
             }
-            if let Err(e) = update_proof(uuid.clone(), &pool).await {
+            if let Err(e) = update_proof(uuid.clone(), &pool, &signer).await {
                 dbg!(&e);
                 cleanup(uuid.clone(), &pool, e.to_string()).await;
                 continue;
