@@ -18,5 +18,10 @@ async function main() {
 
   const factory = Pcr0Manager__factory.connect(address, wallet);
 
-  await factory.addPCR0(pcr0);
+  try {
+    await factory.addPCR0(pcr0);
+  } catch (err) {
+    console.error(err);
+    process.exit(1);
+  }
 }
