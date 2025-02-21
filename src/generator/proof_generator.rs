@@ -4,35 +4,36 @@ use std::path;
 use crate::utils::get_tmp_folder_path;
 
 pub struct ProofGenerator {
-    uuid: String,
+    uuid: uuid::Uuid,
     zkey_file_path: String,
 }
 
 impl ProofGenerator {
-    pub fn new(uuid: String, zkey_file_path: String) -> Self {
+    pub fn new(uuid: uuid::Uuid, zkey_file_path: String) -> Self {
         ProofGenerator {
             uuid,
             zkey_file_path,
         }
     }
 
-    pub fn uuid(&self) -> String {
+    pub fn uuid(&self) -> uuid::Uuid {
         self.uuid.clone()
     }
 
     pub async fn run(&self, rapid_snark_path_exe: &String) -> Result<(), String> {
-        let witness_file_path_str = get_tmp_folder_path(&self.uuid);
-        let witness_file_path = path::Path::new(&witness_file_path_str).join("output.wtns");
+        // let witness_file_path_str = get_tmp_folder_path(&self.uuid.to_string());
+        let tmp_folder_path = get_tmp_folder_path(&self.uuid.to_string());
+        let witness_file_path = path::Path::new(&tmp_folder_path).join("output.wtns");
 
         if !witness_file_path.exists() {
             return Err("Witness file does not exist".to_string());
         }
 
-        let proof_file_path_str = get_tmp_folder_path(&self.uuid);
-        let proof_file_path = path::Path::new(&proof_file_path_str).join("proof.json");
+        // let proof_file_path_str = get_tmp_folder_path(&self.uuid.to_string());
+        let proof_file_path = path::Path::new(&tmp_folder_path).join("proof.json");
 
-        let public_inputs = get_tmp_folder_path(&self.uuid);
-        let public_inputs = path::Path::new(&public_inputs).join("public_inputs.json");
+        // let public_inputs = get_tmp_folder_path(&self.uuid);
+        let public_inputs = path::Path::new(&tmp_folder_path).join("public_inputs.json");
 
         match tokio::process::Command::new(format!("./{}", rapid_snark_path_exe))
             .arg(&self.zkey_file_path)

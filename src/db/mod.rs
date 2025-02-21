@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use sqlx::types::{chrono::Utc, Json};
+use sqlx::types::chrono::Utc;
 
 use crate::{
     types::{EndpointType, ProofType},
@@ -10,7 +10,7 @@ pub mod types;
 type PublicInputs = Vec<String>;
 
 pub async fn create_proof_status(
-    uuid: &String,
+    uuid: uuid::Uuid,
     proof_type: &ProofType,
     circuit_name: &str,
     on_chain: bool,
@@ -27,7 +27,7 @@ pub async fn create_proof_status(
         "INSERT INTO proofs (proof_type, request_id, status, created_at, circuit_name, onchain, endpoint_type, endpoint) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
     )
     .bind(proof_type_id)
-    .bind(sqlx::types::Uuid::parse_str(&uuid).unwrap())
+    .bind(sqlx::types::Uuid::from(uuid))
     .bind(status)
     .bind(now)
     .bind(circuit_name)
@@ -44,7 +44,7 @@ pub async fn create_proof_status(
 }
 
 pub async fn set_witness_generated(
-    uuid: String,
+    uuid: uuid::Uuid,
     db: &sqlx::Pool<sqlx::Postgres>,
 ) -> Result<(), sqlx::Error> {
     let status: i32 = types::Status::WitnessGenerated.into();
@@ -55,7 +55,7 @@ pub async fn set_witness_generated(
     ))
     .bind(status)
     .bind(now)
-    .bind(sqlx::types::Uuid::parse_str(&uuid).unwrap())
+    .bind(sqlx::types::Uuid::from(uuid))
     .execute(db)
     .await
     {
@@ -67,10 +67,11 @@ pub async fn set_witness_generated(
     }
 }
 
-pub async fn update_proof(uuid: &String, db: &sqlx::Pool<sqlx::Postgres>) -> Result<(), String> {
-    let proof_file_path = std::path::Path::new(&get_tmp_folder_path(&uuid)).join("proof.json");
+pub async fn update_proof(uuid: uuid::Uuid, db: &sqlx::Pool<sqlx::Postgres>) -> Result<(), String> {
+    let proof_file_path =
+        std::path::Path::new(&get_tmp_folder_path(&uuid.to_string())).join("proof.json");
     let public_inputs_file_path =
-        std::path::Path::new(&get_tmp_folder_path(&uuid)).join("public_inputs.json");
+        std::path::Path::new(&get_tmp_folder_path(&uuid.to_string())).join("public_inputs.json");
 
     //remove the unwrap here later
     let proof_string = match std::fs::read_to_string(&proof_file_path) {
@@ -123,7 +124,7 @@ pub async fn update_proof(uuid: &String, db: &sqlx::Pool<sqlx::Postgres>) -> Res
     .bind(status)
     .bind(now)
     .bind(public_inputs)
-    .bind(sqlx::types::Uuid::parse_str(&uuid).unwrap())
+    .bind(sqlx::types::uuid::Uuid::from(uuid))
     .execute(db)
     .await
     {
@@ -135,7 +136,7 @@ pub async fn update_proof(uuid: &String, db: &sqlx::Pool<sqlx::Postgres>) -> Res
 }
 
 pub async fn fail_proof(
-    uuid: &String,
+    uuid: uuid::Uuid,
     db: &sqlx::Pool<sqlx::Postgres>,
     reason: String,
 ) -> Result<(), sqlx::Error> {
@@ -143,7 +144,7 @@ pub async fn fail_proof(
     match sqlx::query("UPDATE proofs SET status = $1, reason = $2 WHERE request_id = $3")
         .bind(status)
         .bind(reason)
-        .bind(sqlx::types::Uuid::parse_str(&uuid).unwrap())
+        .bind(sqlx::types::Uuid::from(uuid))
         .execute(db)
         .await
     {
