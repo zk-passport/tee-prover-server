@@ -1,7 +1,19 @@
 ######## Enclave image ########
 
-FROM public.ecr.aws/docker/library/rust:1.81-bookworm AS rust-builder
+FROM public.ecr.aws/docker/library/rust:1.81-bookworm AS chef
+
+RUN cargo install cargo-chef 
+
 WORKDIR /src/
+
+FROM chef AS planner
+COPY Cargo.toml Cargo.lock ./
+COPY src src/
+RUN cargo chef prepare  --recipe-path recipe.json
+
+FROM chef AS builder
+COPY --from=planner /src/recipe.json recipe.json
+RUN cargo chef cook --release --recipe-path recipe.json
 COPY Cargo.toml Cargo.lock ./
 COPY src src/
 
@@ -25,12 +37,11 @@ RUN chown root:root /usr/local/bin/start.sh
 RUN chmod 755 /usr/local/bin/start.sh
 ARG PROOFTYPE=${PROOFTYPE}
 
-COPY --from=rust-builder /src/target/release/tee-server /usr/local/bin/
+COPY --from=builder /src/target/release/tee-server /usr/local/bin/
 WORKDIR /
-# COPY circuits /circuits
 COPY artifact.zip artifact.zip
 RUN unzip artifact.zip -d /all-circuits && \
-    mv /all-circuits/$PROOFTYPE /circuits && \
+    mv /all-circuits/$PROOFTYPE/*_cpp /circuits && \
     rm -rf /artifact.zip /all-circuits
 
 COPY ./zkeys/$PROOFTYPE /zkeys
