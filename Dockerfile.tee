@@ -41,8 +41,8 @@ COPY --from=builder /src/target/release/tee-server /usr/local/bin/
 WORKDIR /
 COPY artifact.zip artifact.zip
 RUN mkdir /circuits
-RUN unzip artifact.zip -d /all-circuits && \
-    mv /all-circuits/$PROOFTYPE/*_cpp /circuits && \
+RUN unzip artifact.zip -d /all-circuits
+RUN mv /all-circuits/$PROOFTYPE/*_cpp /circuits && \
     rm -rf /artifact.zip /all-circuits
 
 COPY ./zkeys/$PROOFTYPE /zkeys
