@@ -40,6 +40,11 @@ jobs:
             -o artifact.zip \
             "$ARTIFACT_URL"
 
+      - name: Login to AWS
+        run: |
+          aws --profile default configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws --profile default configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
       - name: Download and unpack zkeys
         run: |
           rm -rf zkeys
