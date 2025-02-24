@@ -49,8 +49,8 @@ jobs:
         run: |
           rm -rf zkeys
           # curl -L -o zkeys.tar.zst https://self-protocol.s3.eu-west-1.amazonaws.com/zkeys.tar.zst
-          # tar --zstd -xf zkeys.tar.zst
           aws s3 cp s3://self-protocol/zkeys.tar.zst .
+          tar --zstd -xf zkeys.tar.zst
           sudo yum install rename
           rename 's/_0000$//' *
 
