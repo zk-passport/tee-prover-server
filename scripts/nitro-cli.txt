@@ -3,9 +3,9 @@ sudo dnf install aws-nitro-enclaves-cli-devel -y && \
 sudo usermod -aG ne ec2-user && \
 sudo usermod -aG docker ec2-user && \
 nitro-cli --version && \
-sudo sed -i "s/^memory_mib:.*/memory_mib: 51200/; s/^cpu_count:.*/cpu_count: 12/" /etc/nitro_enclaves/allocator.yaml && \
+sudo sed -i "s/^memory_mib:.*/memory_mib: 184320/; s/^cpu_count:.*/cpu_count: 84/" /etc/nitro_enclaves/allocator.yaml && \
 sudo systemctl enable --now nitro-enclaves-allocator.service && \
 sudo systemctl enable --now docker
 
-sudo nitro-cli build-enclave --docker-uri nesopie/test-tee-server --output-file prover-server.eif
-sudo nitro-cli run-enclave --cpu-count 12 --memory 51200 --eif-path prover-server.eif --debug-mode --attach-console --enclave-cid 7
+sudo nitro-cli build-enclave --docker-uri selfdotxyz/tee-server-<PROOF_TYPE> --output-file prover-server.eif
+sudo nitro-cli run-enclave --cpu-count 40 --memory 81920 --eif-path prover-server.eif --debug-mode --attach-console --enclave-cid 7

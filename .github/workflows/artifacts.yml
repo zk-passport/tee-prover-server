@@ -76,6 +76,9 @@ jobs:
           sudo docker build --push --build-arg PROOFTYPE=disclose -f Dockerfile.tee --target=nitro-enclave -t ${{ secrets.DOCKER_ORGANIZATION }}/tee-server-disclose:latest .
           sudo docker build --push --build-arg PROOFTYPE=dsc      -f Dockerfile.tee --target=nitro-enclave -t ${{ secrets.DOCKER_ORGANIZATION }}/tee-server-dsc:latest .
 
+      - name: Cleanup zkeys
+        run: rm -rf zkeys*
+
       - name: Build eifs
         run: |
           mkdir measurements && sudo chmod 777 measurements
