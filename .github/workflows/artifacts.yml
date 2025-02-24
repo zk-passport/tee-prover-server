@@ -16,10 +16,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
-          lfs: true
+          # lfs: true
 
-      - name: Checkout lfs objects
-        run: git lfs checkout
+      # - name: Checkout lfs objects
+      #   run: git lfs checkout
 
       - name: Install Artifacts
         run: |
@@ -43,7 +43,7 @@ jobs:
       - name: Download and unpack zkeys
         run: |
           rm -rf zkeys
-          curl -L -o zkeys.tar.zst https://self-protocol.s3.eu-west-1.amazonaws.com/zkeys/zkeys.tar.zst
+          curl -L -o zkeys.tar.zst https://self-protocol.s3.eu-west-1.amazonaws.com/zkeys.tar.zst
           tar --zstd -xf zkeys.tar.zst
           sudo yum install rename
           rename 's/_0000$//' *
