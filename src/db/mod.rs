@@ -127,10 +127,9 @@ pub async fn update_proof(
     let r: [u8; 32] = alloy_signature.r().to_be_bytes();
     let s: [u8; 32] = alloy_signature.s().to_be_bytes();
 
-    let mut signature = Vec::with_capacity(65);
-    signature.extend_from_slice(&r);
-    signature.extend_from_slice(&s);
-    signature.push(parity as u8);
+    let mut signature = hex::encode(r);
+    signature.push_str(&hex::encode(s));
+    signature.push_str(&format!("{:x}", parity));
 
     let mut public_inputs_reader = serde_json::de::Deserializer::from_str(&public_inputs_string);
 

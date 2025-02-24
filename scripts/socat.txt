@@ -3,3 +3,4 @@ socat tcp-listen:8888,fork,reuseaddr vsock-connect:7:8888 # for the rpc server
 socat vsock-listen:8889,fork,reuseaddr TCP4:<DB_HOST>:5432 # for the db 
 
 echo "postgres://<USERNAME>:<PASSWORD>@host:5432/<DBNAME>" | socat -t 1 - VSOCK-CONNECT:7:8890
+echo "<PRIVATE KEY>" | socat -t 1 - VSOCK-CONNECT:7:8890

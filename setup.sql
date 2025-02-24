@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS proofs (
     endpoint_type VARCHAR(128),
     endpoint VARCHAR(128),
     public_inputs TEXT[],
-    signature TEXT[], 
+    signature CHAR(130), 
     reason TEXT, 
     identifier VARCHAR(255)
 );
