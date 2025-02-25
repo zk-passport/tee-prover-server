@@ -1,5 +1,6 @@
 name: OpenPassport CI/CD
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -52,7 +53,7 @@ jobs:
           aws s3 cp s3://self-protocol/zkeys.tar.zst .
           tar --zstd -xf zkeys.tar.zst
           mkdir zkeys
-          for file in *_0000.zkey; do mv "$file" "zkeys/${file%_0000.zkey}.zkey"; done
+          for file in *_final.zkey; do mv "$file" "zkeys/${file%_final.zkey}.zkey"; done
 
       - name: Reformat zkeys
         run: |

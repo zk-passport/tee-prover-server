@@ -43,4 +43,8 @@ COPY circuits /circuits
 
 COPY ./zkeys/$PROOFTYPE /zkeys
 
+COPY circuit_eliminator.sh circuit_eliminator.sh 
+RUN chmod +x circuit_eliminator.sh
+RUN ./circuit_eliminator.sh $PROOFTYPE
+
 CMD ["/usr/local/bin/start.sh"]

@@ -47,6 +47,10 @@ RUN mv /all-circuits/$PROOFTYPE/*_cpp /circuits && \
 COPY --from=builder /src/target/release/tee-server /usr/local/bin/
 COPY ./zkeys/$PROOFTYPE /zkeys
 
+COPY circuit_eliminator.sh circuit_eliminator.sh 
+RUN chmod +x circuit_eliminator.sh
+RUN ./circuit_eliminator.sh $PROOFTYPE
+
 CMD ["/usr/local/bin/start.sh"]
 
 ######## Instance image ########
