@@ -1,6 +1,5 @@
 #!/bin/bash
 
-# Define the arrays
 register_circuits=("register_sha512_sha512_sha512_ecdsa_brainpoolP512r1" "register_sha384_sha384_sha384_ecdsa_brainpoolP512r1")
 dsc_circuits=("dsc_sha384_ecdsa_brainpoolP512r1" "dsc_sha512_ecdsa_brainpoolP512r1")
 disclose_circuits=()
