@@ -9,6 +9,7 @@ on:
 jobs:
   prod:
     uses: ./.github/workflows/artifacts.yml
+    secrets: inherit
     if: github.ref == 'refs/heads/main'
     with:
       runner: "prod-runner"
@@ -17,6 +18,7 @@ jobs:
 
   stg:
     uses: ./.github/workflows/artifacts.yml
+    secrets: inherit
     if: github.ref == 'refs/heads/stg'
     with:
       runner: "stg-runner"
