@@ -17,6 +17,8 @@ DATABASE_URL="postgres://$DB_USER:$DB_PASS@127.0.0.2:8889/$DB_NAME"
 
 echo $DATABASE_URL
 
+ulimit -s 500000
+
 ./usr/local/bin/tee-server \
     --server-address=127.0.0.1:8888 \
     --database-url=$DATABASE_URL \
