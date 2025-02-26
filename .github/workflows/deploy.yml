@@ -1,0 +1,22 @@
+name: Deploy workflow
+
+on:
+  workflow_dispatch:
+  push: branches ['main', 'stg']
+
+jobs:
+  prod:
+    uses: ./.github/workflows/reusable-workflow.yaml
+    if: github.ref == 'refs/heads/main'
+    with:
+      runner: "prod-runner"
+      environment: "PRD"
+      tag: "latest"
+
+  stg:
+    uses: ./.github/workflows/reusable-workflow.yaml
+    if: github.ref == 'refs/heads/stg'
+    with:
+      runner: "stg-runner"
+      environment: "STG"
+      tag: "stg"

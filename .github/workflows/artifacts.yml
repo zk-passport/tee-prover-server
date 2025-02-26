@@ -1,16 +1,23 @@
 name: OpenPassport CI/CD
 on:
-  workflow_dispatch:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
+  workflow_call:
+    inputs:
+      runner:
+        description: The runner
+        required: true
+        type: string
+      environment:
+        description: The GitHub Actions environment
+        required: true
+        type: string
+      tag:
+        description: The tag
+        required: true
+        type: string
 
 jobs:
-  build:
-    runs-on: self-hosted
+  prod:
+    runs-on: [self-hosted, "${{ inputs.runner }}"]
 
     steps:
       - name: Checkout Repository
@@ -73,9 +80,9 @@ jobs:
 
       - name: Build and push Docker enclave images
         run: |
-          sudo docker build --push --build-arg PROOFTYPE=register -f Dockerfile.tee --target=nitro-enclave -t ${{ secrets.DOCKER_ORGANIZATION }}/tee-server-register:latest .
-          sudo docker build --push --build-arg PROOFTYPE=disclose -f Dockerfile.tee --target=nitro-enclave -t ${{ secrets.DOCKER_ORGANIZATION }}/tee-server-disclose:latest .
-          sudo docker build --push --build-arg PROOFTYPE=dsc      -f Dockerfile.tee --target=nitro-enclave -t ${{ secrets.DOCKER_ORGANIZATION }}/tee-server-dsc:latest .
+          sudo docker build --push --build-arg PROOFTYPE=register -f Dockerfile.tee --target=nitro-enclave -t ${{ secrets.DOCKER_ORGANIZATION }}/tee-server-register:${{ inputs.runner }} .
+          sudo docker build --push --build-arg PROOFTYPE=disclose -f Dockerfile.tee --target=nitro-enclave -t ${{ secrets.DOCKER_ORGANIZATION }}/tee-server-disclose:${{ inputs.runner }} .
+          sudo docker build --push --build-arg PROOFTYPE=dsc      -f Dockerfile.tee --target=nitro-enclave -t ${{ secrets.DOCKER_ORGANIZATION }}/tee-server-dsc:${{ inputs.runner }} .
 
       - name: Cleanup zkeys
         run: rm -rf zkeys*
@@ -92,9 +99,9 @@ jobs:
 
       - name: Build and push Docker instance images
         run: |
-          sudo docker build --push --build-arg PROOFTYPE=register -f Dockerfile.tee --target=instance -t ${{ secrets.DOCKER_ORGANIZATION }}/tee-server-register-instance:latest .
-          sudo docker build --push --build-arg PROOFTYPE=disclose -f Dockerfile.tee --target=instance -t ${{ secrets.DOCKER_ORGANIZATION }}/tee-server-disclose-instance:latest .
-          sudo docker build --push --build-arg PROOFTYPE=dsc      -f Dockerfile.tee --target=instance -t ${{ secrets.DOCKER_ORGANIZATION }}/tee-server-dsc-instance:latest .
+          sudo docker build --push --build-arg PROOFTYPE=register -f Dockerfile.tee --target=instance -t ${{ secrets.DOCKER_ORGANIZATION }}/tee-server-register-instance:${{ inputs.runner }} .
+          sudo docker build --push --build-arg PROOFTYPE=disclose -f Dockerfile.tee --target=instance -t ${{ secrets.DOCKER_ORGANIZATION }}/tee-server-disclose-instance:${{ inputs.runner }} .
+          sudo docker build --push --build-arg PROOFTYPE=dsc      -f Dockerfile.tee --target=instance -t ${{ secrets.DOCKER_ORGANIZATION }}/tee-server-dsc-instance:${{ inputs.runner }} .
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
