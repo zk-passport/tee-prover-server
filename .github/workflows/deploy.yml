@@ -8,7 +8,7 @@ on:
 
 jobs:
   prod:
-    uses: ./.github/workflows/reusable-workflow.yaml
+    uses: ./.github/workflows/artifacts.yml
     if: github.ref == 'refs/heads/main'
     with:
       runner: "prod-runner"
@@ -16,7 +16,7 @@ jobs:
       tag: "latest"
 
   stg:
-    uses: ./.github/workflows/reusable-workflow.yaml
+    uses: ./.github/workflows/artifacts.yml
     if: github.ref == 'refs/heads/stg'
     with:
       runner: "stg-runner"
